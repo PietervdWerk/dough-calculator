@@ -7,8 +7,8 @@
     "generate-routes": "tsr generate",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "pnpm build && wrangler pages deploy dist/client --project-name dough-calculator --branch main",
-    "deploy:preview": "pnpm build && wrangler pages deploy dist/client --project-name dough-calculator --branch preview"
+    "deploy:prod": "pnpm build && wrangler deploy",
+    "deploy:preview": "pnpm build && wrangler versions upload --preview-alias preview"
   },
   "dependencies": {
     "@tanstack/solid-router": "1.170.38",
@@ -16,16 +16,11 @@
     "solid-js": "^1.9.12"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.62.5",
     "@tanstack/router-cli": "^1.133.21",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
     "vite-plugin-solid": "^2.11.12",
     "wrangler": "^4.147.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "lightningcss"
-    ]
   }
 }

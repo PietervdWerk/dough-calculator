@@ -18,6 +18,9 @@ importers:
         specifier: ^1.9.12
         version: 1.9.15
     devDependencies:
+      '@cloudflare/vite-plugin':
+        specifier: ^1.62.5
+        version: 1.62.5(vite@8.3.3(esbuild@0.28.1)(jiti@2.7.0))(wrangler@4.147.0)
       '@tanstack/router-cli':
         specifier: ^1.133.21
         version: 1.167.40(supports-color@10.2.2)
@@ -129,6 +132,13 @@ packages:
     peerDependenciesMeta:
       workerd:
         optional: true
+
+  '@cloudflare/vite-plugin@1.62.5':
+    resolution: {integrity: sha512-qJJonL8EvKuSPfrwSMiDEPp+klxTU08pan1bgm/jc3LrYe9Hp4XUkIGAcQdgv7P9OZbe6AU+51iMUtQOt85J2w==}
+    hasBin: true
+    peerDependencies:
+      vite: ^6.1.0 || ^7.0.0 || ^8.0.0
+      wrangler: ^4.147.0
 
   '@cloudflare/workerd-darwin-64@1.20261001.1':
     resolution: {integrity: sha512-4cgSgDf28JSw/P5Dj5GCS59hzVqS5XnmGAWNkvYHLI6ODU9idGaMMNEuhJXDkEG/lsABmlVlnCgsdh2VbKWepw==}
@@ -1482,6 +1492,20 @@ snapshots:
       unenv: 2.0.0-rc.24
     optionalDependencies:
       workerd: 1.20261001.1
+
+  '@cloudflare/vite-plugin@1.62.5(vite@8.3.3(esbuild@0.28.1)(jiti@2.7.0))(wrangler@4.147.0)':
+    dependencies:
+      '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261001.1)
+      miniflare: 5.20261001.0-alpha
+      unenv: 2.0.0-rc.24
+      vite: 8.3.3(esbuild@0.28.1)(jiti@2.7.0)
+      workerd: 1.20261001.1
+      wrangler: 4.147.0
+      ws: 8.21.0
+    transitivePeerDependencies:
+      - '@types/node'
+      - bufferutil
+      - utf-8-validate
 
   '@cloudflare/workerd-darwin-64@1.20261001.1':
     optional: true

@@ -8,6 +8,8 @@ A tiny single-page calculator for **Vito Iacopelli’s classic Neapolitan pizza 
 
 The default is Vito’s recipe for **4 balls**, ready in **2 days at 18:00** local time.
 
+**Live:** https://dough-calculator.codeover.nl · preview: https://preview-dough-calculator.codeover.workers.dev
+
 ## How the schedule works
 
 The recipe is a 2–3 day double-fermentation dough. The calculator works backwards from the “pizza ready at” moment:
@@ -38,17 +40,31 @@ Sources: the Autentico instruction manual (spiral 42–190 rpm, bowl 8–36 rpm)
 ## Tech
 
 - **[TanStack Start](https://tanstack.com/start)** with **SolidJS** (`@tanstack/solid-start`, file-based routing).
-- Static **prerendering** enabled — the whole app is a static page (`dist/client/`), no server required.
-- Deployed to **Cloudflare Pages** with `wrangler` (production + preview branches).
+- Static **prerendering** enabled — pages are generated at build time; a Cloudflare Worker serves them (SSR still available).
+- Deployed to **Cloudflare Workers** with `wrangler`, fully declarative in [`wrangler.jsonc`](./wrangler.jsonc): TanStack Start server entry, custom domain (`dough-calculator.codeover.nl` — DNS record and certificate are provisioned automatically on deploy), `workers.dev` URL and version preview URLs.
+
+```jsonc
+{
+  "name": "dough-calculator",
+  "main": "@tanstack/solid-start/server-entry",
+  "workers_dev": true,
+  "preview_urls": true,
+  "routes": [{ "pattern": "dough-calculator.codeover.nl", "custom_domain": true }]
+}
+```
 
 ## Commands
 
 ```bash
 pnpm dev             # local dev server on :3000
-pnpm build           # prerendered static build → dist/client
-pnpm deploy          # build + deploy production to Cloudflare Pages
-pnpm deploy:preview  # build + deploy to the `preview` branch on Cloudflare Pages
+pnpm build           # prerendered build (client assets + Worker bundle)
+pnpm deploy:prod     # build + deploy to production (applies routes/custom domain)
+pnpm deploy:preview  # build + upload a version with the `preview` alias
 ```
+
+> (`pnpm deploy` is reserved by pnpm itself — use `pnpm deploy:prod`.)
+>
+> Production: https://dough-calculator.codeover.nl · Workers URL: https://dough-calculator.codeover.workers.dev · Preview: https://preview-dough-calculator.codeover.workers.dev
 
 ## Recipe & data sources
 
