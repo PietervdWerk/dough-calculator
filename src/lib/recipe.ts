@@ -7,28 +7,19 @@ const RECIPE = {
   /** Full recipe: 1600 g flour → 10 balls of 260 g */
   totalFlourG: 1600,
   poolishFlourG: 400,
-  poolishWaterG: 400,
   yeastG: 5,
   honeyG: 5,
   doughFlourG: 1200,
-  doughWaterG: 600,
   saltG: 40,
 }
 
-export const HYDRATION_PCT = 62.5
-
-/** Yield per gram of flour: flour + water + salt + yeast + honey */
-const YIELD_FACTOR =
-  (RECIPE.totalFlourG +
-    RECIPE.poolishWaterG +
-    RECIPE.doughWaterG +
-    RECIPE.yeastG +
-    RECIPE.honeyG +
-    RECIPE.saltG) /
-  RECIPE.totalFlourG
+/** Vito's reference hydration — calibrated for a Neapolitan 00 (W 260–280). */
+export const REFERENCE_HYDRATION_PCT = 62.5
 
 export interface Ingredients {
   balls: number
+  /** Total hydration used for the scaled batch, % of total flour weight. */
+  hydrationPct: number
   /** Poolish (the day before) */
   poolishFlourG: number
   poolishWaterG: number
@@ -45,23 +36,35 @@ export interface Ingredients {
   poolishTotalG: number
 }
 
-export function scaleIngredients(balls: number): Ingredients {
+/**
+ * Scale Vito's recipe to `balls` dough balls at the given total hydration.
+ * The poolish stays at 100 % hydration (its classic 1:1 ratio); the dough
+ * water absorbs the adjustment for the selected flour.
+ */
+export function scaleIngredients(balls: number, hydrationPct: number): Ingredients {
   const targetDough = balls * BALL_WEIGHT_G
-  const k = targetDough / (RECIPE.totalFlourG * YIELD_FACTOR)
+  const totalWater = RECIPE.totalFlourG * (hydrationPct / 100)
+  const poolishWater = RECIPE.poolishFlourG // poolish is always 1:1
+  const doughWater = totalWater - poolishWater
+  /** Yield per gram of flour: flour + water + salt + yeast + honey */
+  const yieldFactor =
+    (RECIPE.totalFlourG + totalWater + RECIPE.yeastG + RECIPE.honeyG + RECIPE.saltG) /
+    RECIPE.totalFlourG
+  const k = targetDough / (RECIPE.totalFlourG * yieldFactor)
   return {
     balls,
+    hydrationPct,
     poolishFlourG: RECIPE.poolishFlourG * k,
-    poolishWaterG: RECIPE.poolishWaterG * k,
+    poolishWaterG: poolishWater * k,
     yeastG: RECIPE.yeastG * k,
     honeyG: RECIPE.honeyG * k,
     doughFlourG: RECIPE.doughFlourG * k,
-    doughWaterG: RECIPE.doughWaterG * k,
+    doughWaterG: doughWater * k,
     saltG: RECIPE.saltG * k,
     totalFlourG: RECIPE.totalFlourG * k,
-    totalWaterG: (RECIPE.poolishWaterG + RECIPE.doughWaterG) * k,
+    totalWaterG: totalWater * k,
     totalDoughG: targetDough,
-    poolishTotalG:
-      (RECIPE.poolishFlourG + RECIPE.poolishWaterG + RECIPE.yeastG + RECIPE.honeyG) * k,
+    poolishTotalG: (RECIPE.poolishFlourG + poolishWater + RECIPE.yeastG + RECIPE.honeyG) * k,
   }
 }
 
@@ -170,8 +173,12 @@ export function buildPlan(input: {
   mixer: Mixer
   balls: number
   ing: Ingredients
+  /** Kneading window for the selected flour, e.g. '15–18 min'. */
+  kneadMinutes: string
+  /** Chip text for the mix block, e.g. '≈ 18–24 min mixing'. */
+  mixChip: string
 }): Plan {
-  const { now, mixer, balls, ing } = input
+  const { now, mixer, balls, ing, kneadMinutes, mixChip } = input
   const warnings: string[] = []
 
   // Earliest achievable finish: 16 h poolish + 45 min mix block + 24 h cold + 3 h warm
@@ -225,9 +232,9 @@ export function buildPlan(input: {
         `Take the poolish straight from the fridge. Weigh ${g(ing.doughFlourG)} g flour into the mixer bowl and spoon the poolish on top.`,
         `${ph.incorporate.setting} (${ph.incorporate.rpm}) until poolish and flour are combined — no dry pockets.`,
         `Add ${g(ing.doughWaterG)} g of very cold water in 100 g doses at ${ph.water.setting} (${ph.water.rpm}), letting each dose absorb.`,
-        `Knead ${ph.knead.minutes} at ${ph.knead.setting} (${ph.knead.rpm}) until the dough is smooth, glossy and wipes the bowl. Aim for 23–26 °C dough temperature.`,
+        `Knead ${kneadMinutes} at ${ph.knead.setting} (${ph.knead.rpm}) until the dough is smooth, glossy and wipes the bowl. Aim for 23–26 °C dough temperature.`,
       ],
-      chip: '≈ 15–20 min mixing',
+      chip: mixChip,
     },
     {
       at: addMinutes(mixStart, 20),

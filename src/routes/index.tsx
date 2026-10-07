@@ -7,9 +7,10 @@ import {
   onMount,
 } from 'solid-js'
 import { MIXERS, MIXER_LIST, type MixerId } from '../lib/mixers'
+import { FLOURS, FLOUR_LIST, type FlourId } from '../lib/flours'
 import {
   BALL_WEIGHT_G,
-  HYDRATION_PCT,
+  REFERENCE_HYDRATION_PCT,
   buildPlan,
   checkCapacity,
   formatG,
@@ -29,7 +30,7 @@ export const Route = createFileRoute('/')({
       {
         name: 'description',
         content:
-          'Scale Vito Iacopelli’s Neapolitan dough to any number of dough balls, pick your spiral mixer (Autentico 700 or Revo Bake Titan 7.5 PRO) and get exact grams plus a clock-perfect schedule before you bake.',
+          'Scale Vito Iacopelli’s Neapolitan dough to any number of dough balls, pick your flour (Caputo Pizzeria-class 00, strong 00 or all-purpose) and spiral mixer, and get exact grams plus a clock-perfect schedule before you bake.',
       },
     ],
   }),
@@ -38,6 +39,7 @@ export const Route = createFileRoute('/')({
 
 function Home() {
   const [mixerId, setMixerId] = createSignal<MixerId>('autentico')
+  const [flourId, setFlourId] = createSignal<FlourId>('neapolitan')
   const [balls, setBalls] = createSignal(4)
   const [deadlineStr, setDeadlineStr] = createSignal('')
   const [mounted, setMounted] = createSignal(false)
@@ -53,7 +55,8 @@ function Home() {
   const clampBalls = (n: number) => Math.min(30, Math.max(1, Math.round(n) || 1))
 
   const mixer = createMemo(() => MIXERS[mixerId()])
-  const ing = createMemo(() => scaleIngredients(clampBalls(balls())))
+  const flour = createMemo(() => FLOURS[flourId()])
+  const ing = createMemo(() => scaleIngredients(clampBalls(balls()), flour().hydrationPct))
   const capacity = createMemo(() => checkCapacity(mixer(), ing().balls, ing()))
 
   const plan = createMemo<Plan | null>(() => {
@@ -66,6 +69,8 @@ function Home() {
       mixer: mixer(),
       balls: ing().balls,
       ing: ing(),
+      kneadMinutes: flour().kneadMinutes,
+      mixChip: flour().mixChip,
     })
   })
 
@@ -75,8 +80,8 @@ function Home() {
         <p class="eyebrow">Vito Iacopelli’s Neapolitan dough · spiral-mixer edition</p>
         <h1>Dough calculator</h1>
         <p class="sub">
-          Pick your mixer, how many dough balls you want and when you want pizza. You get exact
-          gram amounts and a schedule that works back from that moment.
+          Pick your flour and mixer, how many dough balls you want and when you want pizza. You get
+          exact gram amounts and a schedule that works back from that moment.
         </p>
       </header>
 
@@ -97,6 +102,24 @@ function Home() {
             </For>
           </select>
           <p class="hint">{mixer().blurb}</p>
+        </div>
+
+        <div class="field">
+          <label for="flour">Flour</label>
+          <select
+            id="flour"
+            value={flourId()}
+            onInput={(e) => setFlourId(e.currentTarget.value as FlourId)}
+          >
+            <For each={FLOUR_LIST}>
+              {(f) => (
+                <option value={f.id}>
+                  {f.name} — {f.example}
+                </option>
+              )}
+            </For>
+          </select>
+          <p class="hint">{flour().blurb}</p>
         </div>
 
         <div class="field">
@@ -160,6 +183,7 @@ function Home() {
           const p = plan
           const i = ing
           const m = mixer
+          const fl = flour
           const dayNumber = (d: Date) => {
             const start = new Date(p()!.poolishStart)
             start.setHours(0, 0, 0, 0)
@@ -172,14 +196,19 @@ function Home() {
               <section class="card" aria-label="Ingredients">
                 <h2>Ingredients</h2>
                 <p class="card-sub">
-                  Vito’s ratios: {HYDRATION_PCT}% hydration · 2.5% salt · 25% poolish
+                  Vito’s ratios: {fl().hydrationPct}% hydration · 2.5% salt · 25% poolish
+                  <Show when={fl().hydrationPct !== REFERENCE_HYDRATION_PCT}>
+                    {' '}
+                    — hydration adjusted from Vito’s {REFERENCE_HYDRATION_PCT}% reference for this
+                    flour (see the Flour card below).
+                  </Show>
                 </p>
 
                 <h3>
                   Poolish <span class="tag">the day before</span>
                 </h3>
                 <dl class="rows">
-                  <Row label="Tipo 00 flour" value={`${formatG(i().poolishFlourG)} g`} />
+                  <Row label={fl().ingredientLabel} value={`${formatG(i().poolishFlourG)} g`} />
                   <Row label="Cold water" value={`${formatG(i().poolishWaterG)} g`} />
                   <Row label="Dry yeast" value={`${formatG(i().yeastG)} g`} />
                   <Row label="Honey" value={`${formatG(i().honeyG)} g`} />
@@ -190,7 +219,7 @@ function Home() {
                 </h3>
                 <dl class="rows">
                   <Row label="Poolish" value={`all of it (~${formatG(i().poolishTotalG)} g)`} />
-                  <Row label="Tipo 00 flour" value={`${formatG(i().doughFlourG)} g`} />
+                  <Row label={fl().ingredientLabel} value={`${formatG(i().doughFlourG)} g`} />
                   <Row label="Very cold water" value={`${formatG(i().doughWaterG)} g`} />
                   <Row label="Salt" value={`${formatG(i().saltG)} g`} />
                 </dl>
@@ -203,6 +232,10 @@ function Home() {
                 <p class="hint">
                   Use a 0.1 g scale for yeast and honey; whole grams are fine for the rest.
                   Water in grams = millilitres.
+                </p>
+                <p class="hint">
+                  Mixing <strong>{fl().example}</strong> — full specs and the adjustments to Vito’s
+                  recipe are in the <a href="#flour">Flour card</a> below.
                 </p>
               </section>
 
@@ -239,6 +272,53 @@ function Home() {
                 </ol>
               </section>
 
+              <section class="card flour-detail" id="flour" aria-label="Flour">
+                <h2>Flour — {fl().name}</h2>
+                <p class="card-sub">
+                  Calibrated for <strong>{fl().example}</strong>
+                </p>
+
+                <Show when={fl().warning}>
+                  <div class="banner warn" role="note">
+                    {fl().warning}
+                  </div>
+                </Show>
+
+                <h3>Data we have for this flour</h3>
+                <dl class="rows">
+                  <For each={fl().specs}>{(s) => <Row label={s.label} value={s.value} />}</For>
+                </dl>
+
+                <Show
+                  when={fl().sources.length > 0}
+                  fallback={
+                    <p class="hint">
+                      No published spec sheet for this class of flour — the figures above are
+                      typical ranges, so treat them as guidance, not exact values.
+                    </p>
+                  }
+                >
+                  <p class="hint">
+                    Source{fl().sources.length > 1 ? 's' : ''}:{' '}
+                    <For each={fl().sources}>
+                      {(s, idx) => (
+                        <>
+                          <Show when={idx() > 0}>{' · '}</Show>
+                          <a href={s.url} target="_blank" rel="noreferrer">
+                            {s.label}
+                          </a>
+                        </>
+                      )}
+                    </For>
+                  </p>
+                </Show>
+
+                <h3>Adjustments vs Vito’s original recipe</h3>
+                <ul class="notes">
+                  <For each={fl().adjustments}>{(a) => <li>{a}</li>}</For>
+                </ul>
+              </section>
+
               <section class="card procedure" aria-label="Mixing procedure">
                 <h2>Mixing procedure — {m().name}</h2>
                 <p class="card-sub">
@@ -272,7 +352,7 @@ function Home() {
                       <td>{m().phases.knead.setting}</td>
                       <td>{m().phases.knead.rpm}</td>
                       <td>
-                        {m().phases.knead.what} · {m().phases.knead.minutes}
+                        {m().phases.knead.what} · {fl().kneadMinutes} for this flour
                       </td>
                     </tr>
                   </tbody>

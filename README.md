@@ -2,7 +2,8 @@
 
 A tiny single-page calculator for **Vito Iacopelli’s classic Neapolitan pizza dough**, scaled to your batch and scheduled around the moment you want pizza.
 
-- **Scale:** choose how many dough balls you want — everything is rescaled from Vito’s official recipe (62.5 % hydration, 25 % poolish, 24 h cold ferment).
+- **Flour-aware:** pick a flour profile — Vito's reference Neapolitan 00 (W 260–280), a strong 00 (W 290–330, e.g. METRO Chef 290–320) or weak all-purpose — and the calculator adjusts hydration and knead time, showing the exact specs and sources behind the profile.
+- **Scale:** choose how many dough balls you want — everything is rescaled from Vito’s official recipe (25 % poolish, 24 h cold ferment, 62.5 % hydration on the reference flour).
 - **Mixer-aware:** pick the **Autentico 700** (Vito’s mixer) or the **Revo Bake Titan Tilt 7.5 PRO** and get the exact speed settings for the mixing phase, matched by RPM. Batch-size warnings for the mixer’s minimum/maximum load are included.
 - **Scheduled:** give a “pizza ready at” time and the page back-plans the whole process — when to make the poolish, when to mix (with speeds), when to ball, when to take the balls out of the fridge, when to preheat and when to bake. If your deadline is too soon, it tells you the earliest achievable date and shows that plan instead.
 
@@ -22,6 +23,22 @@ The recipe is a 2–3 day double-fermentation dough. The calculator works backwa
 | −19 h | Make the poolish (window: 16–24 h in the fridge) |
 
 If “now” is already inside the poolish window, the poolish start time is clamped to now and the chip shows the shortened ferment. If the deadline is less than ~43 h 45 m away (16 h poolish + 45 min mix + 24 h cold + 3 h warm-up), the page shows the earliest feasible plan instead.
+
+## Flour profiles
+
+“Tipo 00” is only a grind grade — strength (W) can range from ~200 to 400+, and the flour drives how much water the dough binds and how long it needs to knead. The calculator therefore asks which flour you’re using:
+
+| Profile | Calibrated for | Hydration | Knead |
+| --- | --- | --- | --- |
+| Neapolitan 00 · W 260–280 | [Caputo Pizzeria “00”](https://www.mulinocaputo.it/en/prodotti/pizzeria/) (blue bag) — Vito’s reference | 62.5 % | 12–15 min |
+| Strong 00 · W 290–330 | [METRO Chef Pizza Meel 00 290–320 (5 kg)](https://producten.makro.nl/shop/pv/BTY-X811226/0032/0021/METRO-Chef-Pizza-Meel-00-290-320-5-kg) | 59 % | 15–18 min |
+| Weak 00 / all-purpose · W ≤ 240 | supermarket “pizza flour” with no published W | 56 % | 10–12 min |
+
+The poolish always stays at 100 % hydration (its classic 1:1 ratio); the dough water absorbs the adjustment. The **Flour card** in the app shows exactly which flour each profile is calibrated for, the specs we have for it, and links the sources:
+
+- **Caputo Pizzeria:** W 260–280, protein 12.5 %, P/L 0.50–0.60 — [mulinocaputo.it](https://www.mulinocaputo.it/en/prodotti/pizzeria/).
+- **METRO Chef 290–320:** W 290–320 (from the label’s legal name “MC per pizza 290/320 W”), protein 11 g/100 g (nutrition declaration — not directly comparable to Caputo’s mill spec), Italy, no additives listed, EAN 8026924054327 — [Makro product page](https://producten.makro.nl/shop/pv/BTY-X811226/0032/0021/METRO-Chef-Pizza-Meel-00-290-320-5-kg) and [METRO food-information sheet (PDF)](https://cdn.metro-group.com/nl/nl_fir_811184001001_nl.pdf).
+- **Weak 00 / all-purpose:** no spec sheet — the app says so and shows typical ranges instead.
 
 ## Mixer speed mapping
 

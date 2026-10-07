@@ -196,6 +196,14 @@ input[type='number'] {
   grid-column: 1 / -1;
 }
 
+.flour-detail {
+  grid-column: 1 / -1;
+}
+
+.flour-detail .banner {
+  margin: 0 0 16px;
+}
+
 .placeholder {
   margin-top: 20px;
   padding: 48px 20px;

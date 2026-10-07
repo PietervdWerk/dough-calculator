@@ -16,7 +16,7 @@ export interface Mixer {
   phases: {
     incorporate: MixerPhase
     water: MixerPhase
-    knead: MixerPhase & { minutes: string }
+    knead: MixerPhase
   }
   notes: string[]
   limits: {
@@ -51,7 +51,6 @@ export const MIXERS: Record<MixerId, Mixer> = {
         setting: 'Dial 4–5',
         rpm: '≈ 91–108 rpm',
         what: 'Knead until a smooth “pumpkin”',
-        minutes: '12–15 min',
       },
     },
     notes: [
@@ -86,7 +85,6 @@ export const MIXERS: Record<MixerId, Mixer> = {
         setting: 'Level 3',
         rpm: '≈ 125 rpm',
         what: 'Knead until a smooth “pumpkin”',
-        minutes: '12–15 min',
       },
     },
     notes: [
