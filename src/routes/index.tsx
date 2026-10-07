@@ -71,6 +71,11 @@ function Home() {
       ing: ing(),
       kneadMinutes: flour().kneadMinutes,
       mixChip: flour().mixChip,
+      coldFermentH: flour().coldFermentH,
+      coldFermentMaxH: flour().coldFermentMaxH,
+      poolishMinH: flour().poolishMinH,
+      poolishIdealH: flour().poolishIdealH,
+      poolishMaxH: flour().poolishMaxH,
     })
   })
 

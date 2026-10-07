@@ -11,7 +11,7 @@
  * we actually have for it, and the adjustments to Vito's reference recipe.
  */
 
-export type FlourId = 'neapolitan' | 'strong' | 'weak'
+export type FlourId = 'neapolitan' | 'strong' | 'aldi' | 'weak'
 
 export interface FlourSpec {
   label: string
@@ -36,6 +36,14 @@ export interface FlourProfile {
   kneadMinutes: string
   /** Chip text for the mix block in the schedule. */
   mixChip: string
+  /** Cold ferment of the balls, hours. Vito's default is 24. */
+  coldFermentH: number
+  /** How far the cold ferment can be stretched, hours. */
+  coldFermentMaxH: number
+  /** Poolish window in the fridge, hours. */
+  poolishMinH: number
+  poolishIdealH: number
+  poolishMaxH: number
   /** Label used for the flour rows in the ingredients list. */
   ingredientLabel: string
   /** What changed vs Vito's reference recipe, in plain language. */
@@ -57,6 +65,11 @@ export const FLOURS: Record<FlourId, FlourProfile> = {
     hydrationPct: 62.5,
     kneadMinutes: '12–15 min',
     mixChip: '≈ 15–20 min mixing',
+    coldFermentH: 24,
+    coldFermentMaxH: 48,
+    poolishMinH: 16,
+    poolishIdealH: 19,
+    poolishMaxH: 24,
     ingredientLabel: 'Tipo 00 flour',
     adjustments: ['None — this is Vito’s original recipe (62.5 % hydration · 12–15 min knead).'],
     specs: [
@@ -82,6 +95,11 @@ export const FLOURS: Record<FlourId, FlourProfile> = {
     hydrationPct: 59,
     kneadMinutes: '15–18 min',
     mixChip: '≈ 18–24 min mixing',
+    coldFermentH: 24,
+    coldFermentMaxH: 48,
+    poolishMinH: 16,
+    poolishIdealH: 19,
+    poolishMaxH: 24,
     ingredientLabel: 'Tipo 00 flour',
     adjustments: [
       'Hydration trimmed 62.5 % → 59 %: its 11 g/100 g nutrition protein binds less water than Caputo’s 12.5 %.',
@@ -120,6 +138,66 @@ export const FLOURS: Record<FlourId, FlourProfile> = {
     ],
   },
 
+  aldi: {
+    id: 'aldi',
+    name: 'Aldi CUCINA 00 · W unpublished',
+    example: 'CUCINA Pizzabloem Tipo 00, 1 kg (Aldi NL)',
+    blurb: 'Short-ferment supermarket flour: less water, less kneading, and a plan inside its 6–24 h rise window.',
+    hydrationPct: 58,
+    kneadMinutes: '10–13 min',
+    mixChip: '≈ 13–18 min mixing',
+    coldFermentH: 8,
+    coldFermentMaxH: 12,
+    poolishMinH: 8,
+    poolishIdealH: 12,
+    poolishMaxH: 16,
+    ingredientLabel: 'Tipo 00 flour',
+    adjustments: [
+      'Hydration trimmed 62.5 % → 58 %: ~11.5 g/100 g protein binds less water; the published range is 55–62 %.',
+      'Knead 12–15 → 10–13 min: weaker gluten needs less work and handles over-kneading worse.',
+      'Plan shortened: poolish 16–24 h → 8–16 h and cold ferment 24 h → 8 h (max 12 h), because the published rise window for this flour is only 6–24 h.',
+    ],
+    specs: [
+      { label: 'Type', value: 'Tipo 00' },
+      { label: 'W (strength)', value: 'Not published by Aldi' },
+      {
+        label: 'Protein',
+        value:
+          '~11.5 g / 100 g — from the German sister product “Cucina Pizzamehl Tipo 00” (same brand and recipe family)',
+      },
+      { label: 'P/L (balance)', value: 'Not published' },
+      { label: 'Recommended hydration', value: '55–62 % (sister product, via aldi-sued.de)' },
+      { label: 'Rise window', value: '6–24 h (sister product, via aldi-sued.de)' },
+      { label: 'Ingredients', value: 'Wheat flour; may contain traces of soy, lupine and sesame' },
+      { label: 'Pack claims', value: 'Tipo 00 · “Italian inspired” · Nutri-Score A' },
+      {
+        label: 'Origin & mill',
+        value: 'Not disclosed by Aldi — the sister product is milled by Frießinger Mühle (Germany)',
+      },
+      { label: 'Price', value: '€1.29 / kg at Aldi NL (offer 05.10–11.10; €0.99 in Germany)' },
+    ],
+    sources: [
+      {
+        label: 'Aldi NL product page',
+        url: 'https://www.aldi.nl/product/pizzabloem-1229636-1229636.html',
+      },
+      {
+        label: 'Aldi Nord (DE) product page',
+        url: 'https://www.aldi-nord.de/produkt/pizzamehl-1035065.html',
+      },
+      {
+        label: 'PizzaPlan flour catalogue (values sourced from aldi-sued.de)',
+        url: 'https://pizzaplan.app/nl/pizzameel/',
+      },
+      {
+        label: 'OpenFoodFacts scan of the sister product',
+        url: 'https://world.openfoodfacts.org/product/4061464949645',
+      },
+    ],
+    warning:
+      'Aldi publishes no W or protein for this flour, so the profile leans on the German sister product. Treat it as a short-ferment flour: if the dough looks slack, drop hydration 1–2 % or cut the cold ferment shorter.',
+  },
+
   weak: {
     id: 'weak',
     name: 'Weak 00 / all-purpose · W ≤ 240',
@@ -128,6 +206,11 @@ export const FLOURS: Record<FlourId, FlourProfile> = {
     hydrationPct: 56,
     kneadMinutes: '10–12 min',
     mixChip: '≈ 12–16 min mixing',
+    coldFermentH: 24,
+    coldFermentMaxH: 48,
+    poolishMinH: 16,
+    poolishIdealH: 19,
+    poolishMaxH: 24,
     ingredientLabel: 'Flour',
     adjustments: [
       'Hydration trimmed 62.5 % → 56 %: weaker gluten turns slack sooner, so the dough needs less water.',
@@ -147,5 +230,6 @@ export const FLOURS: Record<FlourId, FlourProfile> = {
 export const FLOUR_LIST: Array<FlourProfile> = [
   FLOURS.neapolitan,
   FLOURS.strong,
+  FLOURS.aldi,
   FLOURS.weak,
 ]

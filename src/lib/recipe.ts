@@ -122,9 +122,6 @@ export function checkCapacity(
 /* ------------------------------------------------------------------ */
 
 export const WARM_HOURS = 3 // balls at room temp before baking (2–4 h)
-export const COLD_HOURS = 24 // cold ferment of the balls (24–48 h)
-export const POOLISH_IDEAL_H = 19 // target fridge time for the poolish (16–24 h)
-export const POOLISH_MIN_H = 16 // hard minimum poolish time
 const MIX_BLOCK_MIN = 45 // mixing (15–20) + rest (5) + balling (~15–20)
 const PREHEAT_MIN = 45
 
@@ -177,21 +174,39 @@ export function buildPlan(input: {
   kneadMinutes: string
   /** Chip text for the mix block, e.g. '≈ 18–24 min mixing'. */
   mixChip: string
+  /** Fermentation windows for the selected flour (hours). */
+  coldFermentH: number
+  coldFermentMaxH: number
+  poolishMinH: number
+  poolishIdealH: number
+  poolishMaxH: number
 }): Plan {
-  const { now, mixer, balls, ing, kneadMinutes, mixChip } = input
+  const {
+    now,
+    mixer,
+    balls,
+    ing,
+    kneadMinutes,
+    mixChip,
+    coldFermentH,
+    coldFermentMaxH,
+    poolishMinH,
+    poolishIdealH,
+    poolishMaxH,
+  } = input
   const warnings: string[] = []
 
-  // Earliest achievable finish: 16 h poolish + 45 min mix block + 24 h cold + 3 h warm
+  // Earliest achievable finish: poolish minimum + mix block + cold ferment + warm-up
   const earliest = addMinutes(
     now,
-    POOLISH_MIN_H * 60 + MIX_BLOCK_MIN + COLD_HOURS * 60 + WARM_HOURS * 60,
+    poolishMinH * 60 + MIX_BLOCK_MIN + coldFermentH * 60 + WARM_HOURS * 60,
   )
 
   let deadline = input.deadline
   let adjusted = false
   if (deadline.getTime() < earliest.getTime()) {
     warnings.push(
-      `There isn’t enough time for a proper poolish (16 h minimum) plus the 24 h cold ferment. The soonest this dough can be ready is ${formatFull(earliest)} — showing that plan instead.`,
+      `There isn’t enough time for a proper poolish (${poolishMinH} h minimum) plus the ${coldFermentH} h cold ferment. The soonest this dough can be ready is ${formatFull(earliest)} — showing that plan instead.`,
     )
     deadline = earliest
     adjusted = true
@@ -199,10 +214,10 @@ export function buildPlan(input: {
 
   const bakeAt = deadline
   const outAt = subHours(bakeAt, WARM_HOURS)
-  const ballAt = subHours(outAt, COLD_HOURS)
+  const ballAt = subHours(outAt, coldFermentH)
   const mixStart = addMinutes(ballAt, -MIX_BLOCK_MIN)
 
-  const poolishIdeal = subHours(mixStart, POOLISH_IDEAL_H)
+  const poolishIdeal = subHours(mixStart, poolishIdealH)
   const poolishStart =
     poolishIdeal.getTime() < now.getTime() ? new Date(now) : poolishIdeal
   const poolishHours =
@@ -222,7 +237,7 @@ export function buildPlan(input: {
         `Stir in ${g(ing.poolishFlourG)} g tipo 00 flour until it’s a smooth, thick paste.`,
         'Cover and put it in the fridge.',
       ],
-      chip: `${formatDuration(poolishHours * 60)} in the fridge (window: 16–24 h)`,
+      chip: `${formatDuration(poolishHours * 60)} in the fridge (window: ${poolishMinH}–${poolishMaxH} h)`,
     },
     {
       at: mixStart,
@@ -251,7 +266,10 @@ export function buildPlan(input: {
         'Round each piece keeping the top on top, and place them apart in dough boxes or on a covered tray.',
         'Straight into the fridge.',
       ],
-      chip: `cold ferment ${formatDuration(COLD_HOURS * 60)} (you can stretch this to 48 h)`,
+      chip:
+        coldFermentMaxH > coldFermentH
+          ? `cold ferment ${formatDuration(coldFermentH * 60)} (you can stretch this to ${coldFermentMaxH} h)`
+          : `cold ferment ${formatDuration(coldFermentH * 60)}`,
     },
     {
       at: outAt,
@@ -283,11 +301,11 @@ export function buildPlan(input: {
     },
   ]
 
-  // sanity: poolish must not be later than 16 h before mixing
-  if (poolishHours < POOLISH_MIN_H - 0.05) {
+  // sanity: poolish must not be later than the flour's minimum before mixing
+  if (poolishHours < poolishMinH - 0.05) {
     // shouldn't happen (earliest clamps it), but guard anyway
     warnings.push(
-      'The poolish window got squeezed below 16 h — push the finish time a little later if you can.',
+      `The poolish window got squeezed below ${poolishMinH} h — push the finish time a little later if you can.`,
     )
   }
 

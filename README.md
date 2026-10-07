@@ -13,31 +13,33 @@ The default is Vito’s recipe for **4 balls**, ready in **2 days at 18:00** loc
 
 ## How the schedule works
 
-The recipe is a 2–3 day double-fermentation dough. The calculator works backwards from the “pizza ready at” moment:
+The recipe is a double-fermentation dough — 2–3 days on the reference flour, less on short-ferment flours (the windows follow the selected flour profile). The calculator works backwards from the “pizza ready at” moment:
 
 | Offset before bake | Step |
 | --- | --- |
 | −3 h | Balls come out of the fridge (2–4 h warm-up window) |
-| −24 h | Ball the dough into the cold ferment (can be stretched to 48 h) |
+| −24 h | Ball the dough into the cold ferment (stretchable to 48 h; profile-dependent) |
 | −45 min | Mix block: mixing (15–20 min) + rest (5 min) + balling |
-| −19 h | Make the poolish (window: 16–24 h in the fridge) |
+| −19 h | Make the poolish (window: 16–24 h in the fridge; profile-dependent) |
 
-If “now” is already inside the poolish window, the poolish start time is clamped to now and the chip shows the shortened ferment. If the deadline is less than ~43 h 45 m away (16 h poolish + 45 min mix + 24 h cold + 3 h warm-up), the page shows the earliest feasible plan instead.
+If “now” is already inside the poolish window, the poolish start time is clamped to now and the chip shows the shortened ferment. If the deadline is less than the profile’s minimum lead time away (poolish minimum + 45 min mix + cold ferment + 3 h warm-up; ~43 h 45 m on the default profiles), the page shows the earliest feasible plan instead.
 
 ## Flour profiles
 
-“Tipo 00” is only a grind grade — strength (W) can range from ~200 to 400+, and the flour drives how much water the dough binds and how long it needs to knead. The calculator therefore asks which flour you’re using:
+“Tipo 00” is only a grind grade — strength (W) can range from ~200 to 400+, and the flour drives how much water the dough binds, how long it needs to knead, and how long it can ferment. The calculator therefore asks which flour you’re using:
 
-| Profile | Calibrated for | Hydration | Knead |
-| --- | --- | --- | --- |
-| Neapolitan 00 · W 260–280 | [Caputo Pizzeria “00”](https://www.mulinocaputo.it/en/prodotti/pizzeria/) (blue bag) — Vito’s reference | 62.5 % | 12–15 min |
-| Strong 00 · W 290–330 | [METRO Chef Pizza Meel 00 290–320 (5 kg)](https://producten.makro.nl/shop/pv/BTY-X811226/0032/0021/METRO-Chef-Pizza-Meel-00-290-320-5-kg) | 59 % | 15–18 min |
-| Weak 00 / all-purpose · W ≤ 240 | supermarket “pizza flour” with no published W | 56 % | 10–12 min |
+| Profile | Calibrated for | Hydration | Knead | Poolish (fridge) | Cold ferment |
+| --- | --- | --- | --- | --- | --- |
+| Neapolitan 00 · W 260–280 | [Caputo Pizzeria “00”](https://www.mulinocaputo.it/en/prodotti/pizzeria/) (blue bag) — Vito’s reference | 62.5 % | 12–15 min | 16–24 h | 24 h (max 48) |
+| Strong 00 · W 290–330 | [METRO Chef Pizza Meel 00 290–320 (5 kg)](https://producten.makro.nl/shop/pv/BTY-X811226/0032/0021/METRO-Chef-Pizza-Meel-00-290-320-5-kg) | 59 % | 15–18 min | 16–24 h | 24 h (max 48) |
+| Aldi CUCINA 00 · W unpublished | [CUCINA Pizzabloem Tipo 00, 1 kg](https://www.aldi.nl/product/pizzabloem-1229636-1229636.html) | 58 % | 10–13 min | 8–16 h | 8 h (max 12) |
+| Weak 00 / all-purpose · W ≤ 240 | supermarket “pizza flour” with no published W | 56 % | 10–12 min | 16–24 h | 24 h (max 48) |
 
-The poolish always stays at 100 % hydration (its classic 1:1 ratio); the dough water absorbs the adjustment. The **Flour card** in the app shows exactly which flour each profile is calibrated for, the specs we have for it, and links the sources:
+The poolish always stays at 100 % hydration (its classic 1:1 ratio); the dough water absorbs the hydration adjustment. The **Flour card** in the app shows exactly which flour each profile is calibrated for, the specs we have for it, and links the sources:
 
 - **Caputo Pizzeria:** W 260–280, protein 12.5 %, P/L 0.50–0.60 — [mulinocaputo.it](https://www.mulinocaputo.it/en/prodotti/pizzeria/).
 - **METRO Chef 290–320:** W 290–320 (from the label’s legal name “MC per pizza 290/320 W”), protein 11 g/100 g (nutrition declaration — not directly comparable to Caputo’s mill spec), Italy, no additives listed, EAN 8026924054327 — [Makro product page](https://producten.makro.nl/shop/pv/BTY-X811226/0032/0021/METRO-Chef-Pizza-Meel-00-290-320-5-kg) and [METRO food-information sheet (PDF)](https://cdn.metro-group.com/nl/nl_fir_811184001001_nl.pdf).
+- **Aldi CUCINA Pizzabloem:** Aldi publishes no specs. The profile leans on the German sister product “Cucina Pizzamehl Tipo 00” (same brand family, milled by Frießinger Mühle): ~11.5 g/100 g protein, no W published, 55–62 % recommended hydration and a 6–24 h rise window — hence the shortened poolish + cold ferment. Sources: [Aldi NL](https://www.aldi.nl/product/pizzabloem-1229636-1229636.html), [Aldi Nord (DE)](https://www.aldi-nord.de/produkt/pizzamehl-1035065.html), [PizzaPlan flour catalogue](https://pizzaplan.app/nl/pizzameel/) (values sourced from aldi-sued.de), [OpenFoodFacts scan](https://world.openfoodfacts.org/product/4061464949645).
 - **Weak 00 / all-purpose:** no spec sheet — the app says so and shows typical ranges instead.
 
 ## Mixer speed mapping
