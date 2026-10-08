@@ -5,7 +5,7 @@ A tiny single-page calculator for **Vito Iacopelli’s classic Neapolitan pizza 
 - **Flour-aware:** pick a flour profile — Vito's reference Neapolitan 00 (W 260–280), a strong 00 (W 290–330, e.g. METRO Chef 290–320) or weak all-purpose — and the calculator adjusts hydration and knead time, showing the exact specs and sources behind the profile.
 - **Scale:** choose how many dough balls you want — everything is rescaled from Vito’s official recipe (25 % poolish, 24 h cold ferment, 62.5 % hydration on the reference flour).
 - **Mixer-aware:** pick the **Autentico 700** (Vito’s mixer) or the **Revo Bake Titan Tilt 7.5 PRO** and get the exact speed settings for the mixing phase, matched by RPM. Batch-size warnings for the mixer’s minimum/maximum load are included.
-- **Scheduled:** give a “pizza ready at” time and the page back-plans the whole process — when to make the poolish, when to mix (with speeds), when to ball, when to take the balls out of the fridge, when to preheat and when to bake. If your deadline is too soon, it tells you the earliest achievable date and shows that plan instead.
+- **Scheduled:** give a “pizza ready at” time and the page back-plans the whole process — when to make the poolish, when to mix (with speeds), when to ball, when to take the balls out of the fridge, when to preheat and when to bake. The plan is never clamped to “now”, so a poolish that is already fermenting keeps its place; past steps are dimmed and the next step is highlighted with “Next up”.
 
 The default is Vito’s recipe for **4 balls**, ready in **2 days at 18:00** local time.
 
@@ -22,7 +22,7 @@ The recipe is a double-fermentation dough — 2–3 days on the reference flour,
 | −45 min | Mix block: mixing (15–20 min) + rest (5 min) + balling |
 | −19 h | Make the poolish (window: 16–24 h in the fridge; profile-dependent) |
 
-If “now” is already inside the poolish window, the poolish start time is clamped to now and the chip shows the shortened ferment. If the deadline is less than the profile’s minimum lead time away (poolish minimum + 45 min mix + cold ferment + 3 h warm-up; ~43 h 45 m on the default profiles), the page shows the earliest feasible plan instead.
+The plan is always back-planned from the exact finish time you pick — it is never clamped to the current time. So if the poolish is already fermenting from yesterday, it keeps its place in the timeline and you can read the exact times of the remaining steps. Past steps are dimmed and the next upcoming step gets a “Next up · in …” tag. A heads-up note appears when the schedule starts before now, in case you have not started yet and want to pick a later finish time.
 
 ## Flour profiles
 

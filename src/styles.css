@@ -320,6 +320,19 @@ h3:not(.step-body h3) {
   border-color: var(--ok);
 }
 
+/* past steps are dimmed, the next one is called out */
+.step-past {
+  opacity: 0.55;
+}
+
+.step-next::before {
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.step-next .step-body h3 {
+  color: var(--accent-ink);
+}
+
 .step-when {
   display: flex;
   align-items: center;

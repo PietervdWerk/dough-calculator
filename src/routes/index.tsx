@@ -4,6 +4,7 @@ import {
   Show,
   createMemo,
   createSignal,
+  onCleanup,
   onMount,
 } from 'solid-js'
 import { MIXERS, MIXER_LIST, type MixerId } from '../lib/mixers'
@@ -13,6 +14,7 @@ import {
   REFERENCE_HYDRATION_PCT,
   buildPlan,
   checkCapacity,
+  formatDuration,
   formatG,
   formatFull,
   formatStepTime,
@@ -43,6 +45,8 @@ function Home() {
   const [balls, setBalls] = createSignal(4)
   const [deadlineStr, setDeadlineStr] = createSignal('')
   const [mounted, setMounted] = createSignal(false)
+  /** Ticks every minute so past/next markers stay fresh on a long-open page. */
+  const [nowTick, setNowTick] = createSignal(Date.now())
 
   onMount(() => {
     const d = new Date()
@@ -50,6 +54,8 @@ function Home() {
     d.setHours(18, 0, 0, 0)
     setDeadlineStr(toLocalInputValue(d))
     setMounted(true)
+    const timer = setInterval(() => setNowTick(Date.now()), 60_000)
+    onCleanup(() => clearInterval(timer))
   })
 
   const clampBalls = (n: number) => Math.min(30, Math.max(1, Math.round(n) || 1))
@@ -196,6 +202,8 @@ function Home() {
             day.setHours(0, 0, 0, 0)
             return Math.round((day.getTime() - start.getTime()) / 86_400_000) + 1
           }
+          const nowTs = nowTick()
+          const nextIdx = p()!.steps.findIndex((s) => s.at.getTime() >= nowTs)
           return (
             <div class="results">
               <section class="card" aria-label="Ingredients">
@@ -247,7 +255,8 @@ function Home() {
               <section class="card" aria-label="Schedule">
                 <h2>Your timeline</h2>
                 <p class="card-sub">
-                  Works back from <strong>{formatFull(p()!.bakeAt)}</strong>. Local time.
+                  Works back from <strong>{formatFull(p()!.bakeAt)}</strong>. Local time — past
+                  steps are dimmed, “Next up” is what to do next.
                 </p>
 
                 <Show when={p()!.warnings.length > 0}>
@@ -258,11 +267,20 @@ function Home() {
 
                 <ol class="timeline">
                   <For each={p()!.steps}>
-                    {(s) => (
-                      <li class={`step step-${s.kind}`}>
+                    {(s, i) => (
+                      <li
+                        class={`step step-${s.kind}${s.at.getTime() < nowTs ? ' step-past' : ''}${
+                          i() === nextIdx ? ' step-next' : ''
+                        }`}
+                      >
                         <div class="step-when">
                           <span class="day-pill">Day {dayNumber(s.at)}</span>
                           <time datetime={s.at.toISOString()}>{formatStepTime(s.at)}</time>
+                          <Show when={i() === nextIdx}>
+                            <span class="tag">
+                              Next up · in {formatDuration((s.at.getTime() - nowTs) / 60_000)}
+                            </span>
+                          </Show>
                         </div>
                         <div class="step-body">
                           <h3>{s.title}</h3>

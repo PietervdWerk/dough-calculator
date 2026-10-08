@@ -144,8 +144,6 @@ export interface ScheduleStep {
 
 export interface Plan {
   deadline: Date
-  effectiveDeadline: Date
-  adjusted: boolean
   warnings: string[]
   poolishStart: Date
   mixStart: Date
@@ -196,33 +194,16 @@ export function buildPlan(input: {
   } = input
   const warnings: string[] = []
 
-  // Earliest achievable finish: poolish minimum + mix block + cold ferment + warm-up
-  const earliest = addMinutes(
-    now,
-    poolishMinH * 60 + MIX_BLOCK_MIN + coldFermentH * 60 + WARM_HOURS * 60,
-  )
-
-  let deadline = input.deadline
-  let adjusted = false
-  if (deadline.getTime() < earliest.getTime()) {
-    warnings.push(
-      `There isn’t enough time for a proper poolish (${poolishMinH} h minimum) plus the ${coldFermentH} h cold ferment. The soonest this dough can be ready is ${formatFull(earliest)} — showing that plan instead.`,
-    )
-    deadline = earliest
-    adjusted = true
-  }
-
-  const bakeAt = deadline
+  // The schedule is always back-planned from the chosen finish time — it is
+  // never clamped to "now" — so a poolish that is already fermenting from
+  // yesterday keeps its place in the timeline.
+  const bakeAt = input.deadline
   const outAt = subHours(bakeAt, WARM_HOURS)
   const ballAt = subHours(outAt, coldFermentH)
   const mixStart = addMinutes(ballAt, -MIX_BLOCK_MIN)
 
-  const poolishIdeal = subHours(mixStart, poolishIdealH)
-  const poolishStart =
-    poolishIdeal.getTime() < now.getTime() ? new Date(now) : poolishIdeal
-  const poolishHours =
-    Math.round(((mixStart.getTime() - poolishStart.getTime()) / 3_600_000) * 60) /
-    60
+  const poolishStart = subHours(mixStart, poolishIdealH)
+  const poolishHours = poolishIdealH
 
   const g = (v: number) => formatG(v)
   const ph = mixer.phases
@@ -302,17 +283,17 @@ export function buildPlan(input: {
   ]
 
   // sanity: poolish must not be later than the flour's minimum before mixing
-  if (poolishHours < poolishMinH - 0.05) {
-    // shouldn't happen (earliest clamps it), but guard anyway
+  // Heads-up when the back-planned schedule reaches into the past — e.g. the
+  // poolish is already fermenting from yesterday. In that case the times below
+  // are still exactly what the remaining steps need.
+  if (poolishStart.getTime() < now.getTime()) {
     warnings.push(
-      `The poolish window got squeezed below ${poolishMinH} h — push the finish time a little later if you can.`,
+      `Heads-up: this schedule starts in the past — the poolish was due ${formatFull(poolishStart)}. If it is already fermenting, just follow the remaining steps below. If you have not started it yet, pick a later finish time.`,
     )
   }
 
   return {
     deadline: input.deadline,
-    effectiveDeadline: deadline,
-    adjusted,
     warnings,
     poolishStart,
     mixStart,
