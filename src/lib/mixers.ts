@@ -50,7 +50,7 @@ export const MIXERS: Record<MixerId, Mixer> = {
       knead: {
         setting: 'Dial 4–5',
         rpm: '≈ 91–108 rpm',
-        what: 'Knead until a smooth “pumpkin”',
+        what: 'Salt goes in first, then knead until a smooth “pumpkin”',
       },
     },
     notes: [
@@ -84,7 +84,7 @@ export const MIXERS: Record<MixerId, Mixer> = {
       knead: {
         setting: 'Level 3',
         rpm: '≈ 125 rpm',
-        what: 'Knead until a smooth “pumpkin”',
+        what: 'Salt goes in first, then knead until a smooth “pumpkin”',
       },
     },
     notes: [
