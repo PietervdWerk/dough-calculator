@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/solid-router'
 import {
   For,
   Show,
+  createEffect,
   createMemo,
   createSignal,
   onCleanup,
@@ -9,6 +10,23 @@ import {
 } from 'solid-js'
 import { MIXERS, MIXER_LIST, type MixerId } from '../lib/mixers'
 import { FLOURS, FLOUR_LIST, type FlourId } from '../lib/flours'
+import {
+  FLOUR_PRICES,
+  GAS_DEFAULTS,
+  MOZZARELLA_LIST,
+  MOZZARELLA_PER_PIZZA_G,
+  MOZZARELLAS,
+  PANTRY_PRICES,
+  SAUCE_LIST,
+  SAUCE_PER_PIZZA_G,
+  SAUCES,
+  buildCosts,
+  formatEuro,
+  type MozzarellaId,
+  type PantryId,
+  type PriceSource,
+  type SauceId,
+} from '../lib/costs'
 import {
   BALL_WEIGHT_G,
   REFERENCE_HYDRATION_PCT,
@@ -39,6 +57,26 @@ export const Route = createFileRoute('/')({
   component: Home,
 })
 
+/** Editable price inputs in the cost card, in pantry order. */
+const PANTRY_INPUTS: Array<{ id: PantryId; label: string }> = [
+  { id: 'salt', label: 'Salt (€/kg)' },
+  { id: 'yeast', label: 'Dry yeast (€/kg)' },
+  { id: 'honey', label: 'Honey (€/kg)' },
+]
+
+/** Every priced product, grouped by store for the sources list. */
+const SOURCES_BY_STORE = (['Dirk', 'Makro', 'AH', 'Aldi'] as const)
+  .map((store) => ({
+    store,
+    sources: [
+      ...FLOUR_LIST.map((f): PriceSource => FLOUR_PRICES[f.id]),
+      ...Object.values(PANTRY_PRICES),
+      ...SAUCE_LIST,
+      ...MOZZARELLA_LIST,
+    ].filter((s) => s.store === store),
+  }))
+  .filter((g) => g.sources.length > 0)
+
 function Home() {
   const [mixerId, setMixerId] = createSignal<MixerId>('autentico')
   const [flourId, setFlourId] = createSignal<FlourId>('neapolitan')
@@ -47,6 +85,23 @@ function Home() {
   const [mounted, setMounted] = createSignal(false)
   /** Ticks every minute so past/next markers stay fresh on a long-open page. */
   const [nowTick, setNowTick] = createSignal(Date.now())
+
+  /* Cost calculator state — defaults are real shelf prices (see costs.ts). */
+  const [saucePerPizzaG, setSaucePerPizzaG] = createSignal(SAUCE_PER_PIZZA_G)
+  const [mozzarellaPerPizzaG, setMozzarellaPerPizzaG] = createSignal(MOZZARELLA_PER_PIZZA_G)
+  const [includeGas, setIncludeGas] = createSignal(false)
+  const [gasPerM3, setGasPerM3] = createSignal(GAS_DEFAULTS.perM3)
+  const [gasPerBakeM3, setGasPerBakeM3] = createSignal(GAS_DEFAULTS.perBakeM3)
+  const [sauceId, setSauceId] = createSignal<SauceId>('cirio')
+  const [saucePerKg, setSaucePerKg] = createSignal(SAUCES.cirio.perKg)
+  const [mozzarellaId, setMozzarellaId] = createSignal<MozzarellaId>('aro-stick')
+  const [mozzarellaPerKg, setMozzarellaPerKg] = createSignal(MOZZARELLAS['aro-stick'].perKg)
+  const [flourPerKg, setFlourPerKg] = createSignal(FLOUR_PRICES.neapolitan.perKg)
+  const [pantryPerKg, setPantryPerKg] = createSignal<Record<PantryId, number>>({
+    salt: PANTRY_PRICES.salt.perKg,
+    yeast: PANTRY_PRICES.yeast.perKg,
+    honey: PANTRY_PRICES.honey.perKg,
+  })
 
   onMount(() => {
     const d = new Date()
@@ -59,11 +114,20 @@ function Home() {
   })
 
   const clampBalls = (n: number) => Math.min(30, Math.max(1, Math.round(n) || 1))
+  const clampNum = (n: number, min: number, max: number) =>
+    Math.min(max, Math.max(min, Number.isFinite(n) ? n : min))
+  const eur2 = (n: number) => Math.round(n * 100) / 100
 
   const mixer = createMemo(() => MIXERS[mixerId()])
   const flour = createMemo(() => FLOURS[flourId()])
   const ing = createMemo(() => scaleIngredients(clampBalls(balls()), flour().hydrationPct))
   const capacity = createMemo(() => checkCapacity(mixer(), ing().balls, ing()))
+
+  // Switching flour/sauce/mozzarella swaps in that product's shelf price
+  // (until you edit it in the cost card).
+  createEffect(() => setFlourPerKg(FLOUR_PRICES[flourId()].perKg))
+  createEffect(() => setSaucePerKg(SAUCES[sauceId()].perKg))
+  createEffect(() => setMozzarellaPerKg(MOZZARELLAS[mozzarellaId()].perKg))
 
   const plan = createMemo<Plan | null>(() => {
     if (!mounted() || !deadlineStr()) return null
@@ -84,6 +148,22 @@ function Home() {
       poolishMaxH: flour().poolishMaxH,
     })
   })
+
+  const costs = createMemo(() =>
+    buildCosts({
+      ing: ing(),
+      flourId: flourId(),
+      sauceId: sauceId(),
+      mozzarellaId: mozzarellaId(),
+      saucePerPizzaG: clampNum(saucePerPizzaG(), 0, 500),
+      mozzarellaPerPizzaG: clampNum(mozzarellaPerPizzaG(), 0, 500),
+      flourPerKg: flourPerKg(),
+      pantryPerKg: pantryPerKg(),
+      saucePerKg: saucePerKg(),
+      mozzarellaPerKg: mozzarellaPerKg(),
+      gas: includeGas() ? { perM3: gasPerM3(), perBakeM3: gasPerBakeM3() } : undefined,
+    }),
+  )
 
   return (
     <main class="page">
@@ -293,6 +373,258 @@ function Home() {
                     )}
                   </For>
                 </ol>
+              </section>
+
+              <section class="card costs" aria-label="Cost per pizza">
+                <h2>Cost per pizza</h2>
+                <p class="card-sub">
+                  Real shelf prices from Dirk van den Broek, Makro, Aldi and AH, VAT included —
+                  pick your sauce and mozzarella; every price is editable.
+                </p>
+
+                <div class="cost-controls">
+                  <div class="field field-span-2">
+                    <label for="sauce">Sauce</label>
+                    <select
+                      id="sauce"
+                      value={sauceId()}
+                      onInput={(e) => setSauceId(e.currentTarget.value as SauceId)}
+                    >
+                      <For each={SAUCE_LIST}>
+                        {(s) => (
+                          <option value={s.id}>
+                            {s.product} — {s.pack} ({s.store})
+                          </option>
+                        )}
+                      </For>
+                    </select>
+                    <p class="hint">
+                      {formatEuro(saucePerKg())}/kg · {SAUCES[sauceId()].note}
+                    </p>
+                  </div>
+                  <div class="field">
+                    <label for="sauce-per-pizza">Sauce per pizza (g)</label>
+                    <input
+                      id="sauce-per-pizza"
+                      type="number"
+                      min={0}
+                      max={500}
+                      step={5}
+                      value={saucePerPizzaG()}
+                      onInput={(e) =>
+                        setSaucePerPizzaG(clampNum(parseFloat(e.currentTarget.value), 0, 500))
+                      }
+                    />
+                  </div>
+                  <div class="field field-span-2">
+                    <label for="mozzarella">Mozzarella</label>
+                    <select
+                      id="mozzarella"
+                      value={mozzarellaId()}
+                      onInput={(e) => setMozzarellaId(e.currentTarget.value as MozzarellaId)}
+                    >
+                      <For each={MOZZARELLA_LIST}>
+                        {(m) => (
+                          <option value={m.id}>
+                            {m.product} — {m.pack} ({m.store})
+                          </option>
+                        )}
+                      </For>
+                    </select>
+                    <p class="hint">
+                      {formatEuro(mozzarellaPerKg())}/kg · {MOZZARELLAS[mozzarellaId()].note}
+                    </p>
+                  </div>
+                  <div class="field">
+                    <label for="mozzarella-per-pizza">Mozzarella per pizza (g)</label>
+                    <input
+                      id="mozzarella-per-pizza"
+                      type="number"
+                      min={0}
+                      max={500}
+                      step={5}
+                      value={mozzarellaPerPizzaG()}
+                      onInput={(e) =>
+                        setMozzarellaPerPizzaG(clampNum(parseFloat(e.currentTarget.value), 0, 500))
+                      }
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="gas-on">Oven gas</label>
+                    <div class="check">
+                      <input
+                        id="gas-on"
+                        type="checkbox"
+                        checked={includeGas()}
+                        onChange={(e) => setIncludeGas(e.currentTarget.checked)}
+                      />
+                      <label for="gas-on">Include gas</label>
+                    </div>
+                  </div>
+                  <Show when={includeGas()}>
+                    <div class="field">
+                      <label for="gas-price">Gas price (€/m³)</label>
+                      <input
+                        id="gas-price"
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={eur2(gasPerM3())}
+                        onInput={(e) =>
+                          setGasPerM3(clampNum(parseFloat(e.currentTarget.value), 0, 100))
+                        }
+                      />
+                    </div>
+                    <div class="field">
+                      <label for="gas-per-bake">Gas per bake (m³)</label>
+                      <input
+                        id="gas-per-bake"
+                        type="number"
+                        min={0}
+                        step={0.05}
+                        value={gasPerBakeM3()}
+                        onInput={(e) =>
+                          setGasPerBakeM3(clampNum(parseFloat(e.currentTarget.value), 0, 10))
+                        }
+                      />
+                    </div>
+                  </Show>
+                </div>
+
+                <div class="cost-head">
+                  <p class="cost-big">{formatEuro(costs().perPizza)}</p>
+                  <p class="cost-sub">
+                    per pizza — {formatEuro(costs().total)} for the batch ({i().balls} pizza
+                    {i().balls === 1 ? '' : 's'}) · dough {formatEuro(costs().doughTotal)} ·
+                    toppings {formatEuro(costs().toppingTotal)}
+                    <Show when={includeGas()}> · gas {formatEuro(costs().gasTotal)}</Show>
+                  </p>
+                </div>
+
+                <table class="costs-table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Qty</th>
+                      <th>Price</th>
+                      <th>Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={costs().lines}>
+                      {(l) => (
+                        <tr>
+                          <td>{l.label}</td>
+                          <td>{l.amountText}</td>
+                          <td>{l.unitPriceText}</td>
+                          <td>{formatEuro(l.cost)}</td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="3">
+                        Total — {i().balls} pizza{i().balls === 1 ? '' : 's'}
+                      </td>
+                      <td>{formatEuro(costs().total)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+
+                <details class="price-editor">
+                  <summary>Adjust prices (€ per kg, VAT included)</summary>
+                  <div class="price-grid">
+                    <div class="field">
+                      <label for="price-flour">Flour (€/kg)</label>
+                      <input
+                        id="price-flour"
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={eur2(flourPerKg())}
+                        onInput={(e) =>
+                          setFlourPerKg(clampNum(parseFloat(e.currentTarget.value), 0, 10000))
+                        }
+                      />
+                    </div>
+                    <For each={PANTRY_INPUTS}>
+                      {(item) => (
+                        <div class="field">
+                          <label for={`price-${item.id}`}>{item.label}</label>
+                          <input
+                            id={`price-${item.id}`}
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={eur2(pantryPerKg()[item.id])}
+                            onInput={(e) =>
+                              setPantryPerKg((prev) => ({
+                                ...prev,
+                                [item.id]: clampNum(parseFloat(e.currentTarget.value), 0, 10000),
+                              }))
+                            }
+                          />
+                        </div>
+                      )}
+                    </For>
+                    <div class="field">
+                      <label for="price-sauce">Sauce (€/kg)</label>
+                      <input
+                        id="price-sauce"
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={eur2(saucePerKg())}
+                        onInput={(e) =>
+                          setSaucePerKg(clampNum(parseFloat(e.currentTarget.value), 0, 10000))
+                        }
+                      />
+                    </div>
+                    <div class="field">
+                      <label for="price-mozzarella">Mozzarella (€/kg)</label>
+                      <input
+                        id="price-mozzarella"
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={eur2(mozzarellaPerKg())}
+                        onInput={(e) =>
+                          setMozzarellaPerKg(clampNum(parseFloat(e.currentTarget.value), 0, 10000))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <p class="hint">
+                    The flour, sauce and mozzarella prices follow the products picked above —
+                    switching swaps in that product’s price until you edit it here.
+                  </p>
+                  <p class="hint">Prices checked 12 Oct 2026, VAT included.</p>
+                  <For each={SOURCES_BY_STORE}>
+                    {(group) => (
+                      <p class="hint">
+                        <strong>{group.store}:</strong>{' '}
+                        <For each={group.sources}>
+                          {(s, idx) => (
+                            <>
+                              <Show when={idx() > 0}> · </Show>
+                              <a href={s.url} target="_blank" rel="noreferrer">
+                                {s.product} {s.pack}
+                              </a>
+                            </>
+                          )}
+                        </For>
+                      </p>
+                    )}
+                  </For>
+                </details>
+
+                <p class="hint">
+                  Gas default: €1.68 per m³ — the average Dutch price incl. taxes (Oct 2026) — and
+                  0.3 m³ per bake, about what a typical 2.5 kW gas oven uses for a 45 min preheat
+                  plus baking. Read your meter for the exact figure. Tap water, basil and olive
+                  oil aren’t counted.
+                </p>
               </section>
 
               <section class="card flour-detail" id="flour" aria-label="Flour">

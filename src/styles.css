@@ -427,6 +427,152 @@ h3:not(.step-body h3) {
   margin-bottom: 6px;
 }
 
+/* cost calculator */
+
+.costs {
+  grid-column: 1 / -1;
+}
+
+.cost-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+/* The sauce/mozzarella pickers need room for their product names. */
+@media (min-width: 700px) {
+  .cost-controls .field-span-2 {
+    grid-column: span 2;
+  }
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fdfbf7;
+  cursor: pointer;
+}
+
+.check input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.check label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.cost-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 2px 0 14px;
+}
+
+.cost-big {
+  margin: 0;
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.cost-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.costs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.costs-table th {
+  padding: 0 12px 8px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 11.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.costs-table td {
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px dashed var(--line);
+  vertical-align: top;
+  line-height: 1.45;
+}
+
+.costs-table td:nth-child(2),
+.costs-table td:nth-child(3) {
+  white-space: nowrap;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.costs-table th:last-child,
+.costs-table td:last-child {
+  padding-right: 0;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.costs-table td:last-child {
+  font-weight: 700;
+}
+
+.costs-table tfoot td {
+  border-bottom: 0;
+  border-top: 2px solid var(--line);
+  padding-top: 12px;
+  font-weight: 700;
+}
+
+.price-editor {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.price-editor summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.price-grid input {
+  height: 40px;
+}
+
 /* footer */
 
 .foot {
@@ -454,6 +600,19 @@ h3:not(.step-body h3) {
   .phases td,
   .phases th {
     padding-right: 10px;
+  }
+
+  .cost-big {
+    font-size: 34px;
+  }
+
+  .costs-table {
+    font-size: 12.5px;
+  }
+
+  .costs-table td,
+  .costs-table th {
+    padding-right: 8px;
   }
 }
 
