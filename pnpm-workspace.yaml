@@ -1,3 +1,12 @@
+packages:
+  - .
+
+# Approve native postinstall scripts (esbuild, lightningcss, workerd) for
+# both pnpm 10 (onlyBuiltDependencies) and pnpm 11+ (allowBuilds).
+onlyBuiltDependencies:
+  - esbuild
+  - lightningcss
+  - workerd
 allowBuilds:
   esbuild: true
   lightningcss: true
