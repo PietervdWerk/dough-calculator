@@ -5,10 +5,12 @@
  * Broek, Makro (Amsterdam), Aldi and Albert Heijn. Supermarket prices move all
  * the time, so these are defaults: every price is editable in the UI.
  *
- * Sauce and mozzarella are pickers. To add a product: add its id to the
- * SauceId / MozzarellaId union and an entry to SAUCES / MOZZARELLAS — it shows
- * up in the dropdown in definition order. Use the pack price from the shop and
- * let `perKg` be derived from it, so the note and the maths stay honest.
+ * Sauce and mozzarella are pickers; extra toppings are toggleable rows with
+ * a grams-per-pizza default. To add a product: add its id to the union
+ * (SauceId / MozzarellaId / ToppingId) and an entry to SAUCES / MOZZARELLAS /
+ * TOPPINGS — it shows up in the UI in definition order. Use the pack price
+ * from the shop and let `perKg` be derived from it, so the note and the maths
+ * stay honest.
  */
 
 import { formatG, type Ingredients } from './recipe'
@@ -254,7 +256,76 @@ export const MOZZARELLAS: Record<MozzarellaId, MozzarellaOption> = {
 export const MOZZARELLA_LIST: MozzarellaOption[] = Object.values(MOZZARELLAS)
 
 /* ------------------------------------------------------------------ */
-/* Toppings & gas defaults                                             */
+/* Extra toppings — toggleable, priced per pizza                       */
+/* ------------------------------------------------------------------ */
+
+export type ToppingId = 'parmigiano' | 'salsiccia' | 'pesto-genovese' | 'pesto-rosso'
+
+export interface ToppingOption extends PriceSource {
+  id: ToppingId
+  /** Compact name for the topping rows and price inputs. */
+  short: string
+  /** Default grams per pizza when enabled. */
+  defaultG: number
+  /** Counted by default — the everyday grating. */
+  defaultOn: boolean
+}
+
+export const TOPPINGS: Record<ToppingId, ToppingOption> = {
+  parmigiano: {
+    id: 'parmigiano',
+    product: 'Parmigiano Reggiano',
+    short: 'Parmigiano',
+    pack: '200 g',
+    store: 'Aldi',
+    perKg: 4.99 / 0.2,
+    url: 'https://www.aldi.nl/product/parmigiano-reggiano-1226167.html',
+    note: '€4.99 per 200 g block (CUCINA, D.O.P., 24 months)',
+    defaultG: 5,
+    defaultOn: true,
+  },
+  salsiccia: {
+    id: 'salsiccia',
+    product: 'Salsiccia piccante stagionata',
+    short: 'Salsiccia',
+    pack: '250 g (2 stuks)',
+    store: 'Aldi',
+    perKg: 3.49 / 0.25,
+    url: 'https://www.aldi.nl/product/salsiccia-piccante-stagionata-1233901-1233901.html',
+    note: '€3.49 per 250 g (CUCINA, while stocks last)',
+    defaultG: 50,
+    defaultOn: false,
+  },
+  'pesto-genovese': {
+    id: 'pesto-genovese',
+    product: 'Pesto alla genovese',
+    short: 'Pesto genovese',
+    pack: '190 g jar',
+    store: 'Aldi',
+    perKg: 1.13 / 0.19,
+    url: 'https://www.aldi.nl/product/pesto-alla-genovese-1234733.html',
+    note: '€1.13 per 190 g jar (CUCINA)',
+    defaultG: 20,
+    defaultOn: false,
+  },
+  'pesto-rosso': {
+    id: 'pesto-rosso',
+    product: 'Pesto rosso',
+    short: 'Pesto rosso',
+    pack: '190 g jar',
+    store: 'Aldi',
+    perKg: 1.13 / 0.19,
+    url: 'https://www.aldi.nl/product/pesto-rosso-1234732.html',
+    note: '€1.13 per 190 g jar (CUCINA)',
+    defaultG: 20,
+    defaultOn: false,
+  },
+}
+
+export const TOPPING_LIST: ToppingOption[] = Object.values(TOPPINGS)
+
+/* ------------------------------------------------------------------ */
+/* Per-pizza defaults & gas                                            */
 /* ------------------------------------------------------------------ */
 
 /** Topping defaults for one ~30 cm Neapolitan pizza. */
@@ -279,6 +350,7 @@ export interface CostBreakdown {
   lines: CostLine[]
   doughTotal: number
   toppingTotal: number
+  extrasTotal: number
   gasTotal: number
   total: number
   perPizza: number
@@ -306,6 +378,9 @@ export function buildCosts(input: {
   pantryPerKg: Record<PantryId, number>
   saucePerKg: number
   mozzarellaPerKg: number
+  /** Enabled extra toppings, in display order. */
+  toppings: Array<{ id: ToppingId; gramsPerPizza: number }>
+  toppingPerKg: Record<ToppingId, number>
   /** Omitted when gas is not counted. */
   gas?: { perM3: number; perBakeM3: number }
 }): CostBreakdown {
@@ -330,8 +405,11 @@ export function buildCosts(input: {
       input.mozzarellaPerKg,
     ),
   ]
+  const extraLines = input.toppings.map(({ id, gramsPerPizza }) =>
+    line('Extra', TOPPINGS[id], gramsPerPizza * ing.balls, input.toppingPerKg[id]),
+  )
 
-  const lines = [...doughLines, ...toppingLines]
+  const lines = [...doughLines, ...toppingLines, ...extraLines]
   let gasTotal = 0
   if (input.gas) {
     gasTotal = input.gas.perM3 * input.gas.perBakeM3
@@ -345,11 +423,13 @@ export function buildCosts(input: {
 
   const doughTotal = sum(doughLines)
   const toppingTotal = sum(toppingLines)
-  const total = doughTotal + toppingTotal + gasTotal
+  const extrasTotal = sum(extraLines)
+  const total = doughTotal + toppingTotal + extrasTotal + gasTotal
   return {
     lines,
     doughTotal,
     toppingTotal,
+    extrasTotal,
     gasTotal,
     total,
     perPizza: total / ing.balls,

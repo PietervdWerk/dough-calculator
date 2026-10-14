@@ -20,12 +20,14 @@ import {
   SAUCE_LIST,
   SAUCE_PER_PIZZA_G,
   SAUCES,
+  TOPPING_LIST,
   buildCosts,
   formatEuro,
   type MozzarellaId,
   type PantryId,
   type PriceSource,
   type SauceId,
+  type ToppingId,
 } from '../lib/costs'
 import {
   BALL_WEIGHT_G,
@@ -73,6 +75,7 @@ const SOURCES_BY_STORE = (['Dirk', 'Makro', 'AH', 'Aldi'] as const)
       ...Object.values(PANTRY_PRICES),
       ...SAUCE_LIST,
       ...MOZZARELLA_LIST,
+      ...TOPPING_LIST,
     ].filter((s) => s.store === store),
   }))
   .filter((g) => g.sources.length > 0)
@@ -102,6 +105,15 @@ function Home() {
     yeast: PANTRY_PRICES.yeast.perKg,
     honey: PANTRY_PRICES.honey.perKg,
   })
+  const [toppingOn, setToppingOn] = createSignal(
+    Object.fromEntries(TOPPING_LIST.map((t) => [t.id, t.defaultOn])) as Record<ToppingId, boolean>,
+  )
+  const [toppingG, setToppingG] = createSignal(
+    Object.fromEntries(TOPPING_LIST.map((t) => [t.id, t.defaultG])) as Record<ToppingId, number>,
+  )
+  const [toppingPerKg, setToppingPerKg] = createSignal(
+    Object.fromEntries(TOPPING_LIST.map((t) => [t.id, t.perKg])) as Record<ToppingId, number>,
+  )
 
   onMount(() => {
     const d = new Date()
@@ -157,13 +169,25 @@ function Home() {
       mozzarellaId: mozzarellaId(),
       saucePerPizzaG: clampNum(saucePerPizzaG(), 0, 500),
       mozzarellaPerPizzaG: clampNum(mozzarellaPerPizzaG(), 0, 500),
+      toppings: TOPPING_LIST.filter((t) => toppingOn()[t.id]).map((t) => ({
+        id: t.id,
+        gramsPerPizza: clampNum(toppingG()[t.id], 0, 500),
+      })),
       flourPerKg: flourPerKg(),
       pantryPerKg: pantryPerKg(),
       saucePerKg: saucePerKg(),
       mozzarellaPerKg: mozzarellaPerKg(),
+      toppingPerKg: toppingPerKg(),
       gas: includeGas() ? { perM3: gasPerM3(), perBakeM3: gasPerBakeM3() } : undefined,
     }),
   )
+
+  const setToppingEnabled = (id: ToppingId, on: boolean) =>
+    setToppingOn((prev) => ({ ...prev, [id]: on }))
+  const setToppingGrams = (id: ToppingId, g: number) =>
+    setToppingG((prev) => ({ ...prev, [id]: g }))
+  const setToppingPrice = (id: ToppingId, v: number) =>
+    setToppingPerKg((prev) => ({ ...prev, [id]: v }))
 
   return (
     <main class="page">
@@ -379,7 +403,7 @@ function Home() {
                 <h2>Cost per pizza</h2>
                 <p class="card-sub">
                   Real shelf prices from Dirk van den Broek, Makro, Aldi and AH, VAT included —
-                  pick your sauce and mozzarella; every price is editable.
+                  pick your sauce, mozzarella and extra toppings; every price is editable.
                 </p>
 
                 <div class="cost-controls">
@@ -491,12 +515,60 @@ function Home() {
                   </Show>
                 </div>
 
+                <div class="toppings">
+                  <h3>
+                    Extra toppings <span class="tag">per pizza</span>
+                  </h3>
+                  <div class="topping-grid">
+                    <For each={TOPPING_LIST}>
+                      {(t) => (
+                        <div class={`topping${toppingOn()[t.id] ? '' : ' topping-off'}`}>
+                          <label class="topping-check">
+                            <input
+                              type="checkbox"
+                              checked={toppingOn()[t.id]}
+                              onChange={(e) => setToppingEnabled(t.id, e.currentTarget.checked)}
+                            />
+                            <span class="topping-text">
+                              {t.product}
+                              <small>
+                                {t.store} · {formatEuro(toppingPerKg()[t.id])}/kg · {t.note}
+                              </small>
+                            </span>
+                          </label>
+                          <div class="topping-g">
+                            <input
+                              type="number"
+                              min={0}
+                              max={500}
+                              step={5}
+                              disabled={!toppingOn()[t.id]}
+                              value={toppingG()[t.id]}
+                              onInput={(e) =>
+                                setToppingGrams(
+                                  t.id,
+                                  clampNum(parseFloat(e.currentTarget.value), 0, 500),
+                                )
+                              }
+                            />
+                            <span>g</span>
+                          </div>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </div>
+
                 <div class="cost-head">
                   <p class="cost-big">{formatEuro(costs().perPizza)}</p>
                   <p class="cost-sub">
                     per pizza — {formatEuro(costs().total)} for the batch ({i().balls} pizza
-                    {i().balls === 1 ? '' : 's'}) · dough {formatEuro(costs().doughTotal)} ·
-                    toppings {formatEuro(costs().toppingTotal)}
+                    {i().balls === 1 ? '' : 's'}) · dough {formatEuro(costs().doughTotal)} · sauce
+                    & mozzarella {formatEuro(costs().toppingTotal)}
+                    <Show when={costs().extrasTotal > 0}>
+                      {' '}
+                      · extras {formatEuro(costs().extrasTotal)}
+                    </Show>
                     <Show when={includeGas()}> · gas {formatEuro(costs().gasTotal)}</Show>
                   </p>
                 </div>
@@ -594,10 +666,28 @@ function Home() {
                         }
                       />
                     </div>
+                    <For each={TOPPING_LIST}>
+                      {(t) => (
+                        <div class="field">
+                          <label for={`price-${t.id}`}>{t.short} (€/kg)</label>
+                          <input
+                            id={`price-${t.id}`}
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={eur2(toppingPerKg()[t.id])}
+                            onInput={(e) =>
+                              setToppingPrice(t.id, clampNum(parseFloat(e.currentTarget.value), 0, 10000))
+                            }
+                          />
+                        </div>
+                      )}
+                    </For>
                   </div>
                   <p class="hint">
                     The flour, sauce and mozzarella prices follow the products picked above —
-                    switching swaps in that product’s price until you edit it here.
+                    switching swaps in that product’s price until you edit it here. The topping
+                    prices are editable here too.
                   </p>
                   <p class="hint">Prices checked 12 Oct 2026, VAT included.</p>
                   <For each={SOURCES_BY_STORE}>

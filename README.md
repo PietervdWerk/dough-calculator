@@ -5,7 +5,7 @@ A tiny single-page calculator for **Vito Iacopelli’s classic Neapolitan pizza 
 - **Flour-aware:** pick a flour profile — Vito's reference Neapolitan 00 (W 260–280), a strong 00 (W 290–330, e.g. METRO Chef 290–320) or weak all-purpose — and the calculator adjusts hydration and knead time, showing the exact specs and sources behind the profile.
 - **Scale:** choose how many dough balls you want — everything is rescaled from Vito’s official recipe (25 % poolish, 24 h cold ferment, 62.5 % hydration on the reference flour).
 - **Mixer-aware:** pick the **Autentico 700** (Vito’s mixer) or the **Revo Bake Titan Tilt 7.5 PRO** and get the exact speed settings for the mixing phase, matched by RPM. Batch-size warnings for the mixer’s minimum/maximum load are included.
-- **Costed:** a cost card prices the batch with real shelf prices — Dirk van den Broek (Cirio pizzasaus, Dr. Oetker gist, Jozo zout, honing, patentbloem) and Makro (Caputo Pizzeria, METRO Chef pizza meel, the 1 kg aro mozzarella stick) — plus optional oven gas. Everything is per-pizza and per-batch, and every price is editable because prices move.
+- **Costed:** a cost card prices the batch with real shelf prices — Dirk van den Broek (Cirio pizzasaus, Dr. Oetker gist, Jozo zout, honing, patentbloem), Makro (Caputo Pizzeria, METRO Chef pizza meel, the mozzarella sticks, Mutti tins), Aldi (CUCINA pizzabloem, Cucina Nobile mozzarella, Parmigiano, salsiccia piccante, pesto) and AH (Mutti jars, AH mozzarella) — plus toggleable extra toppings and optional oven gas. Everything is per-pizza and per-batch, and every price is editable because prices move.
 - **Scheduled:** give a “pizza ready at” time and the page back-plans the whole process — when to make the poolish, when to mix (with speeds), when to ball, when to take the balls out of the fridge, when to preheat and when to bake. The plan is never clamped to “now”, so a poolish that is already fermenting keeps its place; past steps are dimmed and the next step is highlighted with “Next up”.
 
 The default is Vito’s recipe for **4 balls**, ready in **2 days at 18:00** local time.
@@ -59,7 +59,7 @@ Sources: the Autentico instruction manual (spiral 42–190 rpm, bowl 8–36 rpm)
 
 ## Cost calculator
 
-The **Cost per pizza** card prices the batch and each pizza from real shelf prices, checked **12 Oct 2026** (VAT included). The flour price follows the flour profile you pick; sauce and mozzarella are pickers, so you can switch products (add more in [`src/lib/costs.ts`](./src/lib/costs.ts)):
+The **Cost per pizza** card prices the batch and each pizza from real shelf prices, checked **12–14 Oct 2026** (VAT included). The flour price follows the flour profile you pick; sauce and mozzarella are pickers, so you can switch products (add more in [`src/lib/costs.ts`](./src/lib/costs.ts)):
 
 | Item | Product | Price |
 | --- | --- | --- |
@@ -76,9 +76,12 @@ The **Cost per pizza** card prices the batch and each pizza from real shelf pric
 | Mozzarella · Makro | [aro Mozzarella Bread, 1 kg stick](https://producten.makro.nl/shop/pv/BTY-X710758/0032/0021/aro-Mozzarella-Bread-1-kg-*) / [METRO Chef, 1 kg stick](https://producten.makro.nl/shop/pv/BTY-X817049/0032/0021/METRO-Chef-Mozzarella-Bread-1-kg) | €9.54 / €9.80 per kg |
 | Mozzarella · Aldi | [Cucina Nobile Mozzarella, 125 g](https://www.aldi.nl/product/mozzarella-1221380.html) | €0.87 / pack |
 | Mozzarella · AH | [AH Mozzarella, 200 g](https://www.ah.nl/producten/product/wi506235/ah-mozzarella) / [AH Italiaanse mozzarella, 228 g](https://www.ah.nl/producten/product/wi195370/ah-italiaanse-mozzarella) | €0.87 / €1.69 |
+| Extra · Parmigiano *(on by default, 5 g)* | [CUCINA Parmigiano Reggiano, 200 g — Aldi](https://www.aldi.nl/product/parmigiano-reggiano-1226167.html) | €4.99 / block |
+| Extra · Salsiccia *(off by default, 50 g)* | [CUCINA Salsiccia piccante stagionata, 250 g — Aldi](https://www.aldi.nl/product/salsiccia-piccante-stagionata-1233901-1233901.html) | €3.49 / pack |
+| Extra · Pesto *(off by default, 20 g)* | [CUCINA Pesto alla genovese, 190 g](https://www.aldi.nl/product/pesto-alla-genovese-1234733.html) / [Pesto rosso, 190 g](https://www.aldi.nl/product/pesto-rosso-1234732.html) — Aldi | €1.13 / jar |
 | Gas (optional) | Average Dutch gas price, Oct 2026 | €1.68 / m³ · 0.3 m³ per bake |
 
-Topping defaults are 80 g sauce and 80 g mozzarella per ~30 cm pizza, editable in the card. Gas is off by default; switch it on to add the oven (€1.68/m³ is the average Dutch price incl. taxes, 0.3 m³ ≈ a 45 min preheat plus baking on a typical 2.5 kW gas oven). Every price is editable under **Adjust prices** — switching product swaps in that product’s price until you edit it, and the sources list links every product page.
+Topping defaults are 80 g sauce and 80 g mozzarella per ~30 cm pizza, editable in the card. Extra toppings are toggles with their own grams-per-pizza: **Parmigiano Reggiano is on by default at 5 g** (Aldi NL doesn’t carry pecorino), while **salsiccia piccante (50 g)** and **pesto (20 g)** start off — tick them when you use them. Gas is off by default; switch it on to add the oven (€1.68/m³ is the average Dutch price incl. taxes, 0.3 m³ ≈ a 45 min preheat plus baking on a typical 2.5 kW gas oven). Every price is editable under **Adjust prices** — switching product swaps in that product’s price until you edit it, and the sources list links every product page.
 
 ## Tech
 
