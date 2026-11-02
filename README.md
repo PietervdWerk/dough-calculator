@@ -118,4 +118,4 @@ pnpm deploy:preview  # build + upload a version with the `preview` alias
 - Mixer specs: [Autentico 700 product page](https://autenti.co/products/autentico-700-spiral-dough-mixer) and its instruction manual (model 10 MO VV: spiral 42 ÷ 190 rpm, tank 8 ÷ 36 rpm).
 - Your machine: [Revo Bake Titan Tilt 7.5 PRO support page](https://revobake.com/pages/revo-bake-titan-tilt-7-5-pro) — official speed chart and user manual.
 
-Nothing you enter leaves the browser — all calculations are client-side.
+Nothing you enter leaves the browser — all calculations are client-side. Saving is on by default: the current recipe (flour, mixer, dough balls, pizza time and cost settings) is kept in this browser's `localStorage`, so you can close the tab and continue the schedule the next day. Switch saving off at the top of the page to remove the stored copy.

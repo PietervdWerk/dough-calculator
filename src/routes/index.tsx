@@ -12,13 +12,10 @@ import { MIXERS, MIXER_LIST, type MixerId } from '../lib/mixers'
 import { FLOURS, FLOUR_LIST, type FlourId } from '../lib/flours'
 import {
   FLOUR_PRICES,
-  GAS_DEFAULTS,
   MOZZARELLA_LIST,
-  MOZZARELLA_PER_PIZZA_G,
   MOZZARELLAS,
   PANTRY_PRICES,
   SAUCE_LIST,
-  SAUCE_PER_PIZZA_G,
   SAUCES,
   TOPPING_LIST,
   buildCosts,
@@ -42,6 +39,15 @@ import {
   toLocalInputValue,
   type Plan,
 } from '../lib/recipe'
+import {
+  clearSavedRecipe,
+  defaultRecipeSettings,
+  loadSavedRecipe,
+  loadSaveEnabled,
+  saveRecipe,
+  storeSaveEnabled,
+  type SavedRecipe,
+} from '../lib/saved-recipe'
 
 export const Route = createFileRoute('/')({
   head: () => ({
@@ -80,46 +86,80 @@ const SOURCES_BY_STORE = (['Dirk', 'Makro', 'AH', 'Aldi'] as const)
   }))
   .filter((g) => g.sources.length > 0)
 
+/** First-visit default: pizza two evenings from now, at 18:00 local time. */
+function defaultDeadlineValue(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 2)
+  d.setHours(18, 0, 0, 0)
+  return toLocalInputValue(d)
+}
+
 function Home() {
-  const [mixerId, setMixerId] = createSignal<MixerId>('autentico')
-  const [flourId, setFlourId] = createSignal<FlourId>('neapolitan')
-  const [balls, setBalls] = createSignal(4)
-  const [deadlineStr, setDeadlineStr] = createSignal('')
+  const initial = defaultRecipeSettings()
+
+  const [mixerId, setMixerId] = createSignal<MixerId>(initial.mixerId)
+  const [flourId, setFlourId] = createSignal<FlourId>(initial.flourId)
+  const [balls, setBalls] = createSignal(initial.balls)
+  const [deadlineStr, setDeadlineStr] = createSignal(initial.deadline)
   const [mounted, setMounted] = createSignal(false)
   /** Ticks every minute so past/next markers stay fresh on a long-open page. */
   const [nowTick, setNowTick] = createSignal(Date.now())
 
+  /* Saving is on by default, so tomorrow's visit continues where today's left off. */
+  const [saveEnabled, setSaveEnabled] = createSignal(true)
+  const [saveError, setSaveError] = createSignal(false)
+
   /* Cost calculator state — defaults are real shelf prices (see costs.ts). */
-  const [saucePerPizzaG, setSaucePerPizzaG] = createSignal(SAUCE_PER_PIZZA_G)
-  const [mozzarellaPerPizzaG, setMozzarellaPerPizzaG] = createSignal(MOZZARELLA_PER_PIZZA_G)
-  const [includeGas, setIncludeGas] = createSignal(false)
-  const [gasPerM3, setGasPerM3] = createSignal(GAS_DEFAULTS.perM3)
-  const [gasPerBakeM3, setGasPerBakeM3] = createSignal(GAS_DEFAULTS.perBakeM3)
-  const [sauceId, setSauceId] = createSignal<SauceId>('cirio')
-  const [saucePerKg, setSaucePerKg] = createSignal(SAUCES.cirio.perKg)
-  const [mozzarellaId, setMozzarellaId] = createSignal<MozzarellaId>('aro-stick')
-  const [mozzarellaPerKg, setMozzarellaPerKg] = createSignal(MOZZARELLAS['aro-stick'].perKg)
-  const [flourPerKg, setFlourPerKg] = createSignal(FLOUR_PRICES.neapolitan.perKg)
-  const [pantryPerKg, setPantryPerKg] = createSignal<Record<PantryId, number>>({
-    salt: PANTRY_PRICES.salt.perKg,
-    yeast: PANTRY_PRICES.yeast.perKg,
-    honey: PANTRY_PRICES.honey.perKg,
-  })
-  const [toppingOn, setToppingOn] = createSignal(
-    Object.fromEntries(TOPPING_LIST.map((t) => [t.id, t.defaultOn])) as Record<ToppingId, boolean>,
+  const [saucePerPizzaG, setSaucePerPizzaG] = createSignal(initial.saucePerPizzaG)
+  const [mozzarellaPerPizzaG, setMozzarellaPerPizzaG] = createSignal(
+    initial.mozzarellaPerPizzaG,
   )
-  const [toppingG, setToppingG] = createSignal(
-    Object.fromEntries(TOPPING_LIST.map((t) => [t.id, t.defaultG])) as Record<ToppingId, number>,
+  const [includeGas, setIncludeGas] = createSignal(initial.includeGas)
+  const [gasPerM3, setGasPerM3] = createSignal(initial.gasPerM3)
+  const [gasPerBakeM3, setGasPerBakeM3] = createSignal(initial.gasPerBakeM3)
+  const [sauceId, setSauceId] = createSignal<SauceId>(initial.sauceId)
+  const [saucePerKg, setSaucePerKg] = createSignal(initial.saucePerKg)
+  const [mozzarellaId, setMozzarellaId] = createSignal<MozzarellaId>(initial.mozzarellaId)
+  const [mozzarellaPerKg, setMozzarellaPerKg] = createSignal(initial.mozzarellaPerKg)
+  const [flourPerKg, setFlourPerKg] = createSignal(initial.flourPerKg)
+  const [pantryPerKg, setPantryPerKg] = createSignal<Record<PantryId, number>>(
+    initial.pantryPerKg,
   )
-  const [toppingPerKg, setToppingPerKg] = createSignal(
-    Object.fromEntries(TOPPING_LIST.map((t) => [t.id, t.perKg])) as Record<ToppingId, number>,
-  )
+  const [toppingOn, setToppingOn] = createSignal(initial.toppingOn)
+  const [toppingG, setToppingG] = createSignal(initial.toppingG)
+  const [toppingPerKg, setToppingPerKg] = createSignal(initial.toppingPerKg)
+
+  const applySavedRecipe = (saved: SavedRecipe) => {
+    setMixerId(saved.mixerId)
+    setFlourId(saved.flourId)
+    setBalls(saved.balls)
+    setDeadlineStr(saved.deadline)
+    setSaucePerPizzaG(saved.saucePerPizzaG)
+    setMozzarellaPerPizzaG(saved.mozzarellaPerPizzaG)
+    setIncludeGas(saved.includeGas)
+    setGasPerM3(saved.gasPerM3)
+    setGasPerBakeM3(saved.gasPerBakeM3)
+    setSauceId(saved.sauceId)
+    setSaucePerKg(saved.saucePerKg)
+    setMozzarellaId(saved.mozzarellaId)
+    setMozzarellaPerKg(saved.mozzarellaPerKg)
+    setFlourPerKg(saved.flourPerKg)
+    setPantryPerKg(saved.pantryPerKg)
+    setToppingOn(saved.toppingOn)
+    setToppingG(saved.toppingG)
+    setToppingPerKg(saved.toppingPerKg)
+  }
 
   onMount(() => {
-    const d = new Date()
-    d.setDate(d.getDate() + 2)
-    d.setHours(18, 0, 0, 0)
-    setDeadlineStr(toLocalInputValue(d))
+    const wantsSaving = loadSaveEnabled()
+    setSaveEnabled(wantsSaving)
+
+    if (wantsSaving) {
+      const saved = loadSavedRecipe()
+      if (saved) applySavedRecipe(saved)
+    }
+    if (!deadlineStr()) setDeadlineStr(defaultDeadlineValue())
+
     setMounted(true)
     const timer = setInterval(() => setNowTick(Date.now()), 60_000)
     onCleanup(() => clearInterval(timer))
@@ -134,12 +174,6 @@ function Home() {
   const flour = createMemo(() => FLOURS[flourId()])
   const ing = createMemo(() => scaleIngredients(clampBalls(balls()), flour().hydrationPct))
   const capacity = createMemo(() => checkCapacity(mixer(), ing().balls, ing()))
-
-  // Switching flour/sauce/mozzarella swaps in that product's shelf price
-  // (until you edit it in the cost card).
-  createEffect(() => setFlourPerKg(FLOUR_PRICES[flourId()].perKg))
-  createEffect(() => setSaucePerKg(SAUCES[sauceId()].perKg))
-  createEffect(() => setMozzarellaPerKg(MOZZARELLAS[mozzarellaId()].perKg))
 
   const plan = createMemo<Plan | null>(() => {
     if (!mounted() || !deadlineStr()) return null
@@ -189,15 +223,81 @@ function Home() {
   const setToppingPrice = (id: ToppingId, v: number) =>
     setToppingPerKg((prev) => ({ ...prev, [id]: v }))
 
+  // Auto-save the whole recipe whenever anything changes. The effect also runs
+  // once after mount, with the restored values when there were any.
+  createEffect(() => {
+    if (!mounted() || !saveEnabled()) return
+    setSaveError(
+      !saveRecipe({
+        mixerId: mixerId(),
+        flourId: flourId(),
+        balls: balls(),
+        deadline: deadlineStr(),
+        saucePerPizzaG: saucePerPizzaG(),
+        mozzarellaPerPizzaG: mozzarellaPerPizzaG(),
+        includeGas: includeGas(),
+        gasPerM3: gasPerM3(),
+        gasPerBakeM3: gasPerBakeM3(),
+        sauceId: sauceId(),
+        saucePerKg: saucePerKg(),
+        mozzarellaId: mozzarellaId(),
+        mozzarellaPerKg: mozzarellaPerKg(),
+        flourPerKg: flourPerKg(),
+        pantryPerKg: pantryPerKg(),
+        toppingOn: toppingOn(),
+        toppingG: toppingG(),
+        toppingPerKg: toppingPerKg(),
+      }),
+    )
+  })
+
+  const toggleSave = (on: boolean) => {
+    setSaveEnabled(on)
+    storeSaveEnabled(on)
+    if (!on) {
+      clearSavedRecipe()
+      setSaveError(false)
+    }
+  }
+
+  const saveStatus = () => {
+    if (!mounted()) return 'Saving on this device.'
+    if (saveError()) return 'Could not save — storage is blocked in this browser.'
+    if (!saveEnabled()) return 'Off — no saved copy; changes are lost when you close this tab.'
+    return 'Saved on this device. Auto-saves as you change.'
+  }
+
   return (
     <main class="page">
       <header class="hero">
-        <p class="eyebrow">Vito Iacopelli’s Neapolitan dough · spiral-mixer edition</p>
-        <h1>Dough calculator</h1>
-        <p class="sub">
-          Pick your flour and mixer, how many dough balls you want and when you want pizza. You get
-          exact gram amounts and a schedule that works back from that moment.
-        </p>
+        <div class="hero-copy">
+          <p class="eyebrow">Vito Iacopelli’s Neapolitan dough · spiral-mixer edition</p>
+          <h1>Dough calculator</h1>
+          <p class="sub">
+            Pick your flour and mixer, how many dough balls you want and when you want pizza. You
+            get exact gram amounts and a schedule that works back from that moment.
+          </p>
+        </div>
+
+        <div class="save-card">
+          <label class="save-toggle">
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label="Save recipe"
+              aria-describedby="save-recipe-tooltip"
+              checked={saveEnabled()}
+              onChange={(e) => toggleSave(e.currentTarget.checked)}
+            />
+            <span class="save-track" aria-hidden="true">
+              <span class="save-thumb" />
+            </span>
+            <span class="save-copy">Save</span>
+          </label>
+          <span class="save-tip" id="save-recipe-tooltip" role="tooltip">
+            {saveStatus()}
+          </span>
+        </div>
       </header>
 
       <section class="card controls" aria-label="Calculator settings">
@@ -224,7 +324,11 @@ function Home() {
           <select
             id="flour"
             value={flourId()}
-            onInput={(e) => setFlourId(e.currentTarget.value as FlourId)}
+            onInput={(e) => {
+              const id = e.currentTarget.value as FlourId
+              setFlourId(id)
+              setFlourPerKg(FLOUR_PRICES[id].perKg)
+            }}
           >
             <For each={FLOUR_LIST}>
               {(f) => (
@@ -412,7 +516,11 @@ function Home() {
                     <select
                       id="sauce"
                       value={sauceId()}
-                      onInput={(e) => setSauceId(e.currentTarget.value as SauceId)}
+                      onInput={(e) => {
+                        const id = e.currentTarget.value as SauceId
+                        setSauceId(id)
+                        setSaucePerKg(SAUCES[id].perKg)
+                      }}
                     >
                       <For each={SAUCE_LIST}>
                         {(s) => (
@@ -445,7 +553,11 @@ function Home() {
                     <select
                       id="mozzarella"
                       value={mozzarellaId()}
-                      onInput={(e) => setMozzarellaId(e.currentTarget.value as MozzarellaId)}
+                      onInput={(e) => {
+                        const id = e.currentTarget.value as MozzarellaId
+                        setMozzarellaId(id)
+                        setMozzarellaPerKg(MOZZARELLAS[id].perKg)
+                      }}
                     >
                       <For each={MOZZARELLA_LIST}>
                         {(m) => (
@@ -839,7 +951,10 @@ function Home() {
           </a>{' '}
           and Autentico 700 specs.
         </p>
-        <p>Everything runs in your browser — no data leaves it. Times use your local timezone.</p>
+        <p>
+          Everything runs in your browser — no data leaves it. With saving on, your recipe stays on
+          this device. Times use your local timezone.
+        </p>
       </footer>
     </main>
   )
