@@ -38,6 +38,7 @@ import {
   scaleIngredients,
   toLocalInputValue,
   type Plan,
+  type ScheduleStep,
 } from '../lib/recipe'
 import {
   clearSavedRecipe,
@@ -48,6 +49,18 @@ import {
   storeSaveEnabled,
   type SavedRecipe,
 } from '../lib/saved-recipe'
+import {
+  buildCalendar,
+  buildStepCalendar,
+  calendarFilename,
+  calendarStepFilename,
+  downloadCalendar,
+  singleEventLinks,
+  stepDurationMinutes,
+  GOOGLE_IMPORT_URL,
+  OUTLOOK_CALENDAR_URL,
+  REMINDER_MIN,
+} from '../lib/calendar'
 
 export const Route = createFileRoute('/')({
   head: () => ({
@@ -85,6 +98,26 @@ const SOURCES_BY_STORE = (['Dirk', 'Makro', 'AH', 'Aldi'] as const)
     ].filter((s) => s.store === store),
   }))
   .filter((g) => g.sources.length > 0)
+
+type CalendarProvider = 'google' | 'apple' | 'outlook' | 'other'
+
+interface CalendarDownloadState {
+  provider: CalendarProvider
+  filename: string
+}
+
+function calendarStatusText(provider: CalendarProvider, steps: number): string {
+  switch (provider) {
+    case 'google':
+      return `${steps} separate events. We opened Google Calendar’s import page — choose the downloaded file there.`
+    case 'outlook':
+      return `${steps} separate events. In Outlook, choose “Add calendar → Upload from file” and pick the downloaded file.`
+    case 'apple':
+      return `${steps} separate events. Open the downloaded file to add them to Apple Calendar.`
+    default:
+      return `${steps} separate events at the exact step times. Import the file in your calendar app.`
+  }
+}
 
 /** First-visit default: pizza two evenings from now, at 18:00 local time. */
 function defaultDeadlineValue(): string {
@@ -179,12 +212,21 @@ function Home() {
     if (!mounted() || !deadlineStr()) return null
     const d = new Date(deadlineStr())
     if (Number.isNaN(d.getTime())) return null
+    const sauceG = clampNum(saucePerPizzaG(), 0, 500)
+    const mozzarellaG = clampNum(mozzarellaPerPizzaG(), 0, 500)
+    const toppings = TOPPING_LIST.filter(
+      (t) => toppingOn()[t.id] && clampNum(toppingG()[t.id], 0, 500) > 0,
+    ).map((t) => ({
+      amount: `${formatG(clampNum(toppingG()[t.id], 0, 500))} g per pizza`,
+      name: t.short,
+    }))
     return buildPlan({
       now: new Date(),
       deadline: d,
       mixer: mixer(),
       balls: ing().balls,
       ing: ing(),
+      flourLabel: flour().ingredientLabel,
       kneadMinutes: flour().kneadMinutes,
       mixChip: flour().mixChip,
       coldFermentH: flour().coldFermentH,
@@ -192,6 +234,14 @@ function Home() {
       poolishMinH: flour().poolishMinH,
       poolishIdealH: flour().poolishIdealH,
       poolishMaxH: flour().poolishMaxH,
+      bakeIngredients: [
+        { amount: '1 per pizza', name: 'dough ball' },
+        ...(sauceG > 0 ? [{ amount: `${formatG(sauceG)} g per pizza`, name: 'sauce' }] : []),
+        ...(mozzarellaG > 0
+          ? [{ amount: `${formatG(mozzarellaG)} g per pizza`, name: 'mozzarella' }]
+          : []),
+        ...toppings,
+      ],
     })
   })
 
@@ -266,6 +316,71 @@ function Home() {
     if (!saveEnabled()) return 'Off — no saved copy; changes are lost when you close this tab.'
     return 'Saved on this device. Auto-saves as you change.'
   }
+
+  const calendarMeta = createMemo(() => ({
+    balls: ing().balls,
+    flourName: flour().name,
+    mixerName: mixer().name,
+  }))
+
+  const [calendarMenuOpen, setCalendarMenuOpen] = createSignal(false)
+  const [calendarDownload, setCalendarDownload] = createSignal<CalendarDownloadState | null>(null)
+  const [calendarStep, setCalendarStep] = createSignal<ScheduleStep | null>(null)
+  const [stepDownloaded, setStepDownloaded] = createSignal(false)
+  let calendarMenuRef: HTMLDivElement | undefined
+  let stepDialogRef: HTMLDialogElement | undefined
+
+  const downloadAllSteps = (provider: CalendarProvider = 'other') => {
+    const p = plan()
+    if (!p) return
+    const filename = calendarFilename(p)
+    downloadCalendar(buildCalendar(p, calendarMeta()), filename)
+    setCalendarMenuOpen(false)
+    setCalendarDownload({ provider, filename })
+    if (provider === 'google') window.open(GOOGLE_IMPORT_URL, '_blank', 'noopener')
+    if (provider === 'outlook') window.open(OUTLOOK_CALENDAR_URL, '_blank', 'noopener')
+  }
+
+  const openStepCalendar = (step: ScheduleStep) => {
+    setCalendarStep(step)
+    setStepDownloaded(false)
+    stepDialogRef?.showModal()
+  }
+
+  const closeStepCalendar = () => {
+    stepDialogRef?.close()
+  }
+
+  const downloadStepIcs = () => {
+    const step = calendarStep()
+    const p = plan()
+    if (!step || !p) return
+    downloadCalendar(buildStepCalendar(step, p, calendarMeta()), calendarStepFilename(step))
+    setStepDownloaded(true)
+  }
+
+  // A download message refers to a specific plan; clear it when the recipe changes.
+  createEffect(() => {
+    plan()
+    setCalendarDownload(null)
+  })
+
+  onMount(() => {
+    const closeMenu = (event: PointerEvent) => {
+      if (calendarMenuRef && !calendarMenuRef.contains(event.target as Node)) {
+        setCalendarMenuOpen(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCalendarMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeMenu)
+    document.addEventListener('keydown', closeOnEscape)
+    onCleanup(() => {
+      document.removeEventListener('pointerdown', closeMenu)
+      document.removeEventListener('keydown', closeOnEscape)
+    })
+  })
 
   return (
     <main class="page">
@@ -460,12 +575,114 @@ function Home() {
                 </p>
               </section>
 
-              <section class="card" aria-label="Schedule">
+              <section class="card schedule" aria-label="Schedule">
                 <h2>Your timeline</h2>
                 <p class="card-sub">
                   Works back from <strong>{formatFull(p()!.bakeAt)}</strong>. Local time — past
                   steps are dimmed, “Next up” is what to do next.
                 </p>
+
+                <div class="calendar-bar">
+                  <div class="split-button" ref={calendarMenuRef}>
+                    <button
+                      type="button"
+                      class="split-main"
+                      onClick={() => downloadAllSteps('other')}
+                    >
+                      <DownloadIcon />
+                      Download all steps (.ics)
+                    </button>
+                    <button
+                      type="button"
+                      class="split-toggle"
+                      aria-label="Choose your calendar"
+                      aria-haspopup="menu"
+                      aria-expanded={calendarMenuOpen()}
+                      aria-controls="calendar-menu"
+                      onClick={() => setCalendarMenuOpen((open) => !open)}
+                    >
+                      <ChevronIcon />
+                    </button>
+                    <Show when={calendarMenuOpen()}>
+                      <div class="calendar-menu" id="calendar-menu" role="menu">
+                        <p class="calendar-menu-head">
+                          One file · {p()!.steps.length} separate events
+                        </p>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          class="calendar-item"
+                          onClick={() => downloadAllSteps('google')}
+                        >
+                          <span>Google Calendar</span>
+                          <span class="calendar-item-note">import page</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          class="calendar-item"
+                          onClick={() => downloadAllSteps('apple')}
+                        >
+                          <span>Apple Calendar</span>
+                          <span class="calendar-item-note">.ics</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          class="calendar-item"
+                          onClick={() => downloadAllSteps('outlook')}
+                        >
+                          <span>Outlook Calendar</span>
+                          <span class="calendar-item-note">open calendar</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          class="calendar-item"
+                          onClick={() => downloadAllSteps('other')}
+                        >
+                          <span>Other calendar</span>
+                          <span class="calendar-item-note">.ics</span>
+                        </button>
+                      </div>
+                    </Show>
+                  </div>
+
+                  <span class="calendar-note">
+                    {`${p()!.steps.length} separate events at the exact step times · ${REMINDER_MIN} min reminder each`}
+                  </span>
+                </div>
+
+                <Show when={calendarDownload()}>
+                  {(download) => (
+                    <div class="calendar-status" role="status">
+                      <span class="calendar-status-check" aria-hidden="true">
+                        ✓
+                      </span>
+                      <div class="calendar-status-body">
+                        <strong>Downloaded {download().filename}</strong>
+                        <p>{calendarStatusText(download().provider, p()!.steps.length)}</p>
+                        <p class="calendar-status-links">
+                          <a href={GOOGLE_IMPORT_URL} target="_blank" rel="noreferrer">
+                            Google Calendar import
+                          </a>
+                          {' · '}
+                          <a href={OUTLOOK_CALENDAR_URL} target="_blank" rel="noreferrer">
+                            Outlook Calendar
+                          </a>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        class="calendar-status-close"
+                        aria-label="Dismiss download message"
+                        onClick={() => setCalendarDownload(null)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+                </Show>
 
                 <Show when={p()!.warnings.length > 0}>
                   <div class="banner warn" role="note">
@@ -489,10 +706,51 @@ function Home() {
                               Next up · in {formatDuration((s.at.getTime() - nowTs) / 60_000)}
                             </span>
                           </Show>
+                          <button
+                            type="button"
+                            class="step-calendar-btn"
+                            aria-label={`Add “${s.title}” to your calendar`}
+                            title="Add this step to your calendar"
+                            onClick={() => openStepCalendar(s)}
+                          >
+                            <CalendarPlusIcon />
+                          </button>
                         </div>
                         <div class="step-body">
                           <h3>{s.title}</h3>
-                          <For each={s.lines}>{(l) => <p>{l}</p>}</For>
+
+                          <Show when={s.equipment.length > 0}>
+                            <div class="step-section">
+                              <h4>Equipment</h4>
+                              <p class="step-equipment">{s.equipment.join(' · ')}</p>
+                            </div>
+                          </Show>
+
+                          <Show when={s.ingredients.length > 0}>
+                            <div class="step-section">
+                              <h4>Ingredients</h4>
+                              <ul class="step-ingredients">
+                                <For each={s.ingredients}>
+                                  {(item) => (
+                                    <li>
+                                      <Show when={item.amount}>
+                                        <span class="step-amount">{item.amount}</span>
+                                      </Show>
+                                      <span>{item.name}</span>
+                                    </li>
+                                  )}
+                                </For>
+                              </ul>
+                            </div>
+                          </Show>
+
+                          <div class="step-section">
+                            <h4>Steps</h4>
+                            <ol class="step-instructions">
+                              <For each={s.instructions}>{(line) => <li>{line}</li>}</For>
+                            </ol>
+                          </div>
+
                           <Show when={s.chip}>
                             <span class="chip">{s.chip}</span>
                           </Show>
@@ -501,6 +759,103 @@ function Home() {
                     )}
                   </For>
                 </ol>
+
+                <dialog
+                  ref={stepDialogRef}
+                  class="calendar-dialog"
+                  aria-labelledby="step-calendar-title"
+                  onClose={() => {
+                    setCalendarStep(null)
+                    setStepDownloaded(false)
+                  }}
+                  onClick={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect()
+                    if (
+                      event.clientX < rect.left ||
+                      event.clientX > rect.right ||
+                      event.clientY < rect.top ||
+                      event.clientY > rect.bottom
+                    ) {
+                      closeStepCalendar()
+                    }
+                  }}
+                >
+                  <Show when={calendarStep()}>
+                    {(step) => {
+                      const links = () => singleEventLinks(step(), p()!, calendarMeta())
+                      return (
+                        <>
+                          <div class="calendar-dialog-head">
+                            <div>
+                              <p class="eyebrow">One step</p>
+                              <h2 id="step-calendar-title">Add to calendar</h2>
+                            </div>
+                            <button
+                              type="button"
+                              class="dialog-close"
+                              aria-label="Close"
+                              onClick={closeStepCalendar}
+                            >
+                              ×
+                            </button>
+                          </div>
+
+                          <div class="calendar-dialog-step">
+                            <div class="step-when">
+                              <span class="day-pill">Day {dayNumber(step().at)}</span>
+                              <time datetime={step().at.toISOString()}>
+                                {formatFull(step().at)}
+                              </time>
+                            </div>
+                            <h3>{step().title}</h3>
+                            <p class="hint">
+                              {formatDuration(stepDurationMinutes(step().kind))} · reminder{' '}
+                              {REMINDER_MIN} min before
+                            </p>
+                          </div>
+
+                          <div class="calendar-dialog-actions">
+                            <a
+                              class="calendar-action"
+                              href={links().google}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={closeStepCalendar}
+                            >
+                              <span>Google Calendar</span>
+                              <span class="calendar-item-note">one click</span>
+                            </a>
+                            <a
+                              class="calendar-action"
+                              href={links().outlook}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={closeStepCalendar}
+                            >
+                              <span>Outlook Calendar</span>
+                              <span class="calendar-item-note">one click</span>
+                            </a>
+                            <button type="button" class="calendar-action" onClick={downloadStepIcs}>
+                              <span>Download .ics</span>
+                              <span class="calendar-item-note">Apple Calendar + others</span>
+                            </button>
+                          </div>
+
+                          <Show when={stepDownloaded()}>
+                            <p class="calendar-dialog-status" role="status">
+                              Downloaded — open the file to add this step.
+                            </p>
+                          </Show>
+
+                          <p class="hint">
+                            This adds only this step. Use <strong>Download all steps</strong> above
+                            to add the whole schedule at once.
+                          </p>
+                        </>
+                      )
+                    }}
+                  </Show>
+                </dialog>
               </section>
 
               <section class="card costs" aria-label="Cost per pizza">
@@ -952,8 +1307,9 @@ function Home() {
           and Autentico 700 specs.
         </p>
         <p>
-          Everything runs in your browser — no data leaves it. With saving on, your recipe stays on
-          this device. Times use your local timezone.
+          Everything runs in your browser — the calculator sends nothing anywhere. With saving on,
+          your recipe stays on this device. Calendar options generate the .ics file locally and open
+          the provider’s import page when needed. Times use your local timezone.
         </p>
       </footer>
     </main>
@@ -966,5 +1322,55 @@ function Row(props: { label: string; value: string }) {
       <dt>{props.label}</dt>
       <dd>{props.value}</dd>
     </div>
+  )
+}
+
+function CalendarPlusIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect
+        x="1.75"
+        y="3.25"
+        width="12.5"
+        height="11"
+        rx="2"
+        stroke="currentColor"
+        stroke-width="1.5"
+      />
+      <path
+        d="M1.75 6.5h12.5M5.25 1.75v3M10.75 1.75v3M8 8.75v3.25M6.4 10.4h3.2"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+      />
+    </svg>
+  )
+}
+
+function ChevronIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path
+        d="M2.5 4.5 6 8l3.5-3.5"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  )
+}
+
+function DownloadIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M8 2v8m0 0 3-3m-3 3L5 7M3 12.5h10"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
   )
 }

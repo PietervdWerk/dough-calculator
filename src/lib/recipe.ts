@@ -134,11 +134,21 @@ export type StepKind =
   | 'preheat'
   | 'bake'
 
+export interface StepIngredient {
+  /** Optional amount, e.g. '157 g' or '1 per pizza'. */
+  amount?: string
+  name: string
+}
+
 export interface ScheduleStep {
   at: Date
   kind: StepKind
+  /** Short, clean title for the timeline and calendar event. */
   title: string
-  lines: string[]
+  equipment: string[]
+  ingredients: StepIngredient[]
+  /** Ordered, action-only instructions. */
+  instructions: string[]
   chip?: string
 }
 
@@ -168,6 +178,8 @@ export function buildPlan(input: {
   mixer: Mixer
   balls: number
   ing: Ingredients
+  /** Ingredient label for the selected flour, e.g. 'tipo 00 flour'. */
+  flourLabel: string
   /** Kneading window for the selected flour, e.g. '15–18 min'. */
   kneadMinutes: string
   /** Chip text for the mix block, e.g. '≈ 18–24 min mixing'. */
@@ -178,12 +190,15 @@ export function buildPlan(input: {
   poolishMinH: number
   poolishIdealH: number
   poolishMaxH: number
+  /** Per-pizza ingredients for the bake step. */
+  bakeIngredients?: StepIngredient[]
 }): Plan {
   const {
     now,
     mixer,
     balls,
     ing,
+    flourLabel,
     kneadMinutes,
     mixChip,
     coldFermentH,
@@ -213,9 +228,17 @@ export function buildPlan(input: {
       at: poolishStart,
       kind: 'poolish',
       title: 'Make the poolish',
-      lines: [
-        `Whisk ${g(ing.poolishWaterG)} g cold water with ${g(ing.yeastG)} g dry yeast until dissolved, then whisk in ${g(ing.honeyG)} g honey and let it stand 5 min.`,
-        `Stir in ${g(ing.poolishFlourG)} g tipo 00 flour until it’s a smooth, thick paste.`,
+      equipment: ['Mixing bowl', 'Whisk', '0.1 g scale', 'Cover or cling film'],
+      ingredients: [
+        { amount: `${g(ing.poolishWaterG)} g`, name: 'cold water' },
+        { amount: `${g(ing.yeastG)} g`, name: 'dry yeast' },
+        { amount: `${g(ing.honeyG)} g`, name: 'honey' },
+        { amount: `${g(ing.poolishFlourG)} g`, name: flourLabel },
+      ],
+      instructions: [
+        'Whisk the cold water and yeast until the yeast dissolves.',
+        'Whisk in the honey and leave for 5 minutes.',
+        'Stir in the flour until smooth and thick.',
         'Cover and put it in the fridge.',
       ],
       chip: `${formatDuration(poolishHours * 60)} in the fridge (window: ${poolishMinH}–${poolishMaxH} h)`,
@@ -223,13 +246,19 @@ export function buildPlan(input: {
     {
       at: mixStart,
       kind: 'mix',
-      title: `Mix the dough on the ${mixer.name}`,
-      lines: [
-        `Take the poolish straight from the fridge. Weigh ${g(ing.doughFlourG)} g flour into the mixer bowl and spoon the poolish on top.`,
-        `${ph.incorporate.setting} (${ph.incorporate.rpm}) until poolish and flour are combined — no dry pockets.`,
-        `Add ${g(ing.doughWaterG)} g of very cold water in 100 g doses at ${ph.water.setting} (${ph.water.rpm}), letting each dose absorb.`,
-        `At ${ph.knead.setting} (${ph.knead.rpm}), mix 1–2 minutes, then slowly pour in the ${g(ing.saltG)} g salt — sprinkle it in, don’t dump it in one spot.`,
-        `Knead ${kneadMinutes} more at ${ph.knead.setting} (${ph.knead.rpm}) until the dough is smooth, glossy and wipes the bowl. Aim for 23–26 °C dough temperature.`,
+      title: 'Mix the dough',
+      equipment: [mixer.name, 'Scale', 'Timer'],
+      ingredients: [
+        { amount: `${g(ing.poolishTotalG)} g`, name: 'poolish, straight from the fridge' },
+        { amount: `${g(ing.doughFlourG)} g`, name: flourLabel },
+        { amount: `${g(ing.doughWaterG)} g`, name: 'very cold water' },
+        { amount: `${g(ing.saltG)} g`, name: 'salt' },
+      ],
+      instructions: [
+        `Mix the poolish and flour on ${ph.incorporate.setting} (${ph.incorporate.rpm}) until combined.`,
+        `Add the cold water in 100 g doses at ${ph.water.setting} (${ph.water.rpm}), letting each dose absorb.`,
+        `Mix 1–2 minutes at ${ph.knead.setting} (${ph.knead.rpm}), then sprinkle in the salt.`,
+        `Knead ${kneadMinutes} at ${ph.knead.setting} (${ph.knead.rpm}) until smooth and glossy. Aim for 23–26 °C.`,
       ],
       chip: mixChip,
     },
@@ -237,16 +266,21 @@ export function buildPlan(input: {
       at: addMinutes(mixStart, 20),
       kind: 'rest',
       title: 'Rest the dough',
-      lines: ['Cover the bowl and rest 5 minutes.'],
+      equipment: ['Bowl cover', 'Timer'],
+      ingredients: [],
+      instructions: ['Cover the bowl and rest for 5 minutes.'],
     },
     {
       at: ballAt,
       kind: 'ball',
-      title: `Ball the dough (${balls} × ${BALL_WEIGHT_G} g)`,
-      lines: [
-        'Take the dough out with wet or oiled hands and divide it into pieces of about 260 g (no bench flour).',
-        'Round each piece keeping the top on top, and place them apart in dough boxes or on a covered tray.',
-        'Straight into the fridge.',
+      title: 'Ball the dough',
+      equipment: ['Scale', 'Dough box or covered tray'],
+      ingredients: [],
+      instructions: [
+        `With wet or oiled hands, divide the dough into ${balls} pieces of about ${BALL_WEIGHT_G} g.`,
+        'Round each piece, keeping the top on top.',
+        'Place them apart in a dough box or on a covered tray.',
+        'Put them straight in the fridge.',
       ],
       chip:
         coldFermentMaxH > coldFermentH
@@ -256,28 +290,36 @@ export function buildPlan(input: {
     {
       at: outAt,
       kind: 'out',
-      title: 'Take the balls out of the fridge',
-      lines: [
-        `${WARM_HOURS} h at room temperature — until they are soft, relaxed and slightly risen.`,
+      title: 'Warm up the dough balls',
+      equipment: [],
+      ingredients: [],
+      instructions: [
+        'Take the dough balls out of the fridge.',
+        `${WARM_HOURS} h at room temperature, until they are soft, relaxed and slightly risen.`,
       ],
       chip: `${WARM_HOURS} h to warm up`,
     },
     {
       at: subHours(bakeAt, PREHEAT_MIN / 60),
       kind: 'preheat',
-      title: 'Preheat',
-      lines: [
-        'Steel or stone on maximum oven heat for at least 45 minutes (home oven 250–300 °C, pizza oven 430–480 °C).',
-        'Get your toppings ready while it heats.',
+      title: 'Preheat the oven',
+      equipment: ['Oven', 'Pizza steel or stone', 'Oven thermometer'],
+      ingredients: [],
+      instructions: [
+        'Put the steel or stone on the highest oven setting for at least 45 minutes.',
+        'Prepare the toppings while the oven heats.',
       ],
     },
     {
       at: bakeAt,
       kind: 'bake',
-      title: 'Bake the pizza',
-      lines: [
-        'Stretch a ball to ~30–33 cm by hand, top it lightly.',
-        'Bake: ~4–7 min on a steel in a home oven, or 60–90 s in a pizza oven.',
+      title: 'Bake the pizzas',
+      equipment: ['Pizza peel', 'Oven', 'Pizza steel or stone'],
+      ingredients: input.bakeIngredients ?? [],
+      instructions: [
+        'Stretch a dough ball to 30–33 cm by hand.',
+        'Top lightly with sauce, mozzarella and any extras.',
+        'Bake 4–7 minutes on a steel in a home oven, or 60–90 seconds in a pizza oven.',
         'Eat. Repeat.',
       ],
     },
